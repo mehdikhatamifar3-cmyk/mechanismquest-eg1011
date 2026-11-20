@@ -1,8 +1,60 @@
-# -*- coding: utf-8 -*-
+
+# -*- coding: ascii -*-
+"""MechanismQuest: encoding-proof Streamlit application.
+
+All source text is ASCII. User-facing Unicode is produced only by explicit
+Unicode escapes, HTML entities, or LaTeX commands.
+"""
 
 import base64
 import math
 from pathlib import Path
+
+
+def _mojibake_markers():
+    """Return common UTF-8-as-Windows-1252 corruption fragments."""
+    return (
+        "\u00c2", "\u00c3", "\u00ce", "\u00cf", "\u00e2\u20ac",
+        "\u00e2\u0161", "\u00ef\u00b8", "\ufffd",
+    )
+
+
+def _find_text_corruption(value, path="root"):
+    """Recursively find mojibake, replacement characters, and C1 controls."""
+    findings = []
+    if isinstance(value, str):
+        for marker in _mojibake_markers():
+            if marker in value:
+                findings.append(path + ": marker " + repr(marker))
+        if any(0x80 <= ord(ch) <= 0x9F for ch in value):
+            findings.append(path + ": C1 control character")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            findings.extend(_find_text_corruption(key, path + ".key"))
+            findings.extend(_find_text_corruption(item, path + "[" + repr(key) + "]"))
+    elif isinstance(value, (list, tuple, set)):
+        for index, item in enumerate(value):
+            findings.extend(_find_text_corruption(item, path + "[" + str(index) + "]"))
+    return findings
+
+
+def startup_source_sanitisation_check():
+    """Fail fast if the deployed source is not strict ASCII or contains mojibake."""
+    raw = Path(__file__).read_bytes()
+    try:
+        source_text = raw.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise RuntimeError(
+            "Encoding safety check failed: app.py contains a raw non-ASCII byte "
+            "at offset " + str(exc.start) + ". Deploy the supplied ASCII-only file."
+        ) from exc
+    findings = _find_text_corruption(source_text, "app.py")
+    if findings:
+        raise RuntimeError("Encoding safety check failed: " + "; ".join(findings[:8]))
+    return True
+
+
+startup_source_sanitisation_check()
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, FancyArrowPatch, Rectangle
@@ -11,13 +63,24 @@ import streamlit as st
 
 st.set_page_config(
     page_title="MechanismQuest",
-    page_icon="âš™ï¸",
+    page_icon="\u2699\ufe0f",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 APP_DIR = Path(__file__).resolve().parent
-LOGO_B64 = base64.b64encode((APP_DIR / "assets" / "jcu_logo.png").read_bytes()).decode("ascii")
+
+
+def load_logo_b64():
+    """Load the optional JCU logo without preventing the app from starting."""
+    logo_path = APP_DIR / "assets" / "jcu_logo.png"
+    if not logo_path.is_file():
+        return ""
+    return base64.b64encode(logo_path.read_bytes()).decode("ascii")
+
+
+LOGO_B64 = load_logo_b64()
+APP_BUILD_ID = "encoding-proof-2026-11-21-r1"
 
 COLORS = {
     "known": "#2563eb",      # blue
@@ -55,7 +118,6 @@ st.markdown(
     html, body, [data-testid="stAppViewContainer"], .stApp {
       background: #ffffff !important;
       color: #0f172a !important;
-      font-family: "Segoe UI", "DejaVu Sans", "Noto Sans", "Arial Unicode MS", sans-serif !important;
     }
     .stApp { background: #ffffff !important; }
     .block-container { max-width: 1460px; padding-top: 1.05rem; padding-bottom: 2rem; }
@@ -101,6 +163,7 @@ st.markdown(
     .app-header { display:grid; grid-template-columns:230px 1fr 190px; gap:24px; align-items:center; padding:16px 10px 20px; }
     .app-header-logo { display:flex; justify-content:center; }
     .app-header-logo img { width:210px; max-height:92px; object-fit:contain; }
+    .logo-fallback { color:#0f172a; text-align:center; line-height:1.25; }
     .app-header-title h1 { margin:0; font-size:34px; line-height:1.05; color:#0f172a !important; }
     .app-header-title p { margin:7px 0 0; color:#334155 !important; line-height:1.45; font-size:15px; }
     .app-header-author { text-align:right; color:#334155 !important; font-size:13px; line-height:1.5; }
@@ -197,12 +260,15 @@ st.markdown(
 
 
 def render_header():
+    logo_html = (
+        f'<img src="data:image/png;base64,{LOGO_B64}" alt="JCU">'
+        if LOGO_B64
+        else '<div class="logo-fallback"><b>JCU</b><br>James Cook University</div>'
+    )
     st.markdown(
         f"""
         <div class="app-header">
-          <div class="app-header-logo">
-            <img src="data:image/png;base64,{LOGO_B64}" alt="JCU">
-          </div>
+          <div class="app-header-logo">{logo_html}</div>
           <div class="app-header-title">
             <h1>MechanismQuest</h1>
             <p>Interactive rigid-body velocity and acceleration analysis practice for EG1011 Statics and Dynamics.</p>
@@ -230,9 +296,9 @@ PROBLEMS = [
         "description": (
             "A disk rotates about a fixed axis. A point P on the rim is located at "
             "r = 0.30 m. At the instant shown, the disk has angular velocity "
-            "Ï‰ = 6 rad/s counterclockwise. Determine the speed of point P."
+            "\u03c9 = 6 rad/s counterclockwise. Determine the speed of point P."
         ),
-        "givens": ["r = 0.30 m", "Ï‰ = 6 rad/s CCW"],
+        "givens": ["r = 0.30 m", "\u03c9 = 6 rad/s CCW"],
         "direction_questions": [
             {
                 "q": "What is the direction of the velocity of point P?",
@@ -250,13 +316,13 @@ PROBLEMS = [
             {
                 "q": "Choose the correct speed relationship.",
                 "options": [
-                    "v = Î±r",
-                    "v = Ï‰r",
-                    "v = Ï‰Â²r",
-                    "v = r/Ï‰",
+                    "v = \u03b1r",
+                    "v = \u03c9r",
+                    "v = \u03c9\u00b2r",
+                    "v = r/\u03c9",
                 ],
-                "correct": "v = Ï‰r",
-                "why": "For fixed-axis rotation, the linear speed equals Ï‰r."
+                "correct": "v = \u03c9r",
+                "why": "For fixed-axis rotation, the linear speed equals \u03c9r."
             }
         ],
         "solve_outputs": [
@@ -275,12 +341,12 @@ PROBLEMS = [
         "difficulty": "Easy",
         "diagram": "slider_velocity",
         "description": (
-            "Link AB has length 0.50 m and is inclined 30Â° above the horizontal. "
+            "Link AB has length 0.50 m and is inclined 30\u00b0 above the horizontal. "
             "Point A moves horizontally to the right at 2.0 m/s. Point B is constrained "
             "to move vertically. Determine the angular velocity of the link and the "
             "velocity of B."
         ),
-        "givens": ["AB = 0.50 m", "Î¸ = 30Â°", "v_A = 2.0 m/s right", "B is a vertical slider"],
+        "givens": ["AB = 0.50 m", "\u03b8 = 30\u00b0", "v_A = 2.0 m/s right", "B is a vertical slider"],
         "direction_questions": [
             {
                 "q": "What is the direction of the relative velocity v_B/A?",
@@ -309,17 +375,17 @@ PROBLEMS = [
             {
                 "q": "Choose the correct vector equation.",
                 "options": [
-                    "v_B = v_A + Î± Ã— r_B/A",
-                    "v_B = v_A + Ï‰ Ã— r_B/A",
-                    "v_B = a_A + Ï‰ Ã— r_B/A",
-                    "v_B = Ï‰r_B/A",
+                    "v_B = v_A + \u03b1 \u00d7 r_B/A",
+                    "v_B = v_A + \u03c9 \u00d7 r_B/A",
+                    "v_B = a_A + \u03c9 \u00d7 r_B/A",
+                    "v_B = \u03c9r_B/A",
                 ],
-                "correct": "v_B = v_A + Ï‰ Ã— r_B/A",
-                "why": "Relative velocity for a rigid body is v_B = v_A + Ï‰ Ã— r_B/A."
+                "correct": "v_B = v_A + \u03c9 \u00d7 r_B/A",
+                "why": "Relative velocity for a rigid body is v_B = v_A + \u03c9 \u00d7 r_B/A."
             }
         ],
         "solve_outputs": [
-            {"label": "Angular velocity Ï‰_AB (CCW positive)", "key": "omegaAB", "value": 8.0, "tol": 0.05, "unit": "rad/s"},
+            {"label": "Angular velocity \u03c9_AB (CCW positive)", "key": "omegaAB", "value": 8.0, "tol": 0.05, "unit": "rad/s"},
             {"label": "Velocity of B (upward positive)", "key": "vB", "value": 3.4641, "tol": 0.03, "unit": "m/s"},
         ],
         "vector_lines": [
@@ -344,10 +410,10 @@ PROBLEMS = [
         "diagram": "linked_velocity",
         "description": (
             "Link AB is horizontal and pinned at A. Link BC is vertical. Both links have "
-            "length 2 m at the instant shown. Slider C moves at 8 m/s down a 45Â° groove. "
+            "length 2 m at the instant shown. Slider C moves at 8 m/s down a 45\u00b0 groove. "
             "Determine the angular velocities of links AB and BC. Use counterclockwise as positive."
         ),
-        "givens": ["AB = 2 m", "BC = 2 m", "v_C = 8 m/s down the 45Â° groove"],
+        "givens": ["AB = 2 m", "BC = 2 m", "v_C = 8 m/s down the 45\u00b0 groove"],
         "direction_questions": [
             {
                 "q": "What is the direction of velocity of point B from the rotation of AB?",
@@ -365,7 +431,7 @@ PROBLEMS = [
                 "options": [
                     "Along BC",
                     "Perpendicular to BC",
-                    "Along the 45Â° groove",
+                    "Along the 45\u00b0 groove",
                     "Horizontal only",
                 ],
                 "correct": "Perpendicular to BC",
@@ -376,18 +442,18 @@ PROBLEMS = [
             {
                 "q": "Choose the correct vector equation for link BC.",
                 "options": [
-                    "v_C = v_B + Ï‰_BC Ã— r_C/B",
-                    "a_C = a_B + Î±_BC Ã— r_C/B - Ï‰_BCÂ² r_C/B",
-                    "v_C = Ï‰_BC r_C/B",
-                    "v_B = v_C + Î±_BC Ã— r_C/B",
+                    "v_C = v_B + \u03c9_BC \u00d7 r_C/B",
+                    "a_C = a_B + \u03b1_BC \u00d7 r_C/B - \u03c9_BC\u00b2 r_C/B",
+                    "v_C = \u03c9_BC r_C/B",
+                    "v_B = v_C + \u03b1_BC \u00d7 r_C/B",
                 ],
-                "correct": "v_C = v_B + Ï‰_BC Ã— r_C/B",
+                "correct": "v_C = v_B + \u03c9_BC \u00d7 r_C/B",
                 "why": "This is the relative-velocity equation for the moving link BC."
             }
         ],
         "solve_outputs": [
-            {"label": "Angular velocity Ï‰_AB (CCW positive)", "key": "omegaAB", "value": -2.8284, "tol": 0.03, "unit": "rad/s"},
-            {"label": "Angular velocity Ï‰_BC (CCW positive)", "key": "omegaBC", "value": 2.8284, "tol": 0.03, "unit": "rad/s"},
+            {"label": "Angular velocity \u03c9_AB (CCW positive)", "key": "omegaAB", "value": -2.8284, "tol": 0.03, "unit": "rad/s"},
+            {"label": "Angular velocity \u03c9_BC (CCW positive)", "key": "omegaBC", "value": 2.8284, "tol": 0.03, "unit": "rad/s"},
         ],
         "vector_lines": [
             r"\mathbf v_C=8(\cos45^\circ\,\mathbf i-\sin45^\circ\,\mathbf j)=(5.657\,\mathbf i-5.657\,\mathbf j)\ \text{m/s}",
@@ -412,12 +478,12 @@ PROBLEMS = [
         "difficulty": "Moderate",
         "diagram": "ic_velocity",
         "description": (
-            "Bar AB has angular velocity Ï‰_AB = 6 rad/s counterclockwise and length AB = 0.200 m. "
+            "Bar AB has angular velocity \u03c9_AB = 6 rad/s counterclockwise and length AB = 0.200 m. "
             "Link BC has length 0.500 m, and point C is a horizontal slider. Determine the angular "
             "velocity of link BC and the velocity of slider C. Report positive angular velocity as CCW "
             "and positive slider velocity to the right."
         ),
-        "givens": ["AB = 0.200 m", "BC = 0.500 m", "Ï‰_AB = 6 rad/s CCW", "C is a horizontal slider"],
+        "givens": ["AB = 0.200 m", "BC = 0.500 m", "\u03c9_AB = 6 rad/s CCW", "C is a horizontal slider"],
         "direction_questions": [
             {
                 "q": "Which method is most efficient when two velocity directions are known?",
@@ -446,12 +512,12 @@ PROBLEMS = [
             {
                 "q": "Choose the correct scalar relationship once the IC is known.",
                 "options": [
-                    "v = Î±r",
-                    "v = Ï‰r",
-                    "v = Ï‰Â²r",
-                    "v = r/Ï‰",
+                    "v = \u03b1r",
+                    "v = \u03c9r",
+                    "v = \u03c9\u00b2r",
+                    "v = r/\u03c9",
                 ],
-                "correct": "v = Ï‰r",
+                "correct": "v = \u03c9r",
                 "why": "At that instant the rigid body behaves like rotation about the IC."
             }
         ],
@@ -485,9 +551,9 @@ PROBLEMS = [
         "diagram": "belt_velocity",
         "description": (
             "Two pulleys are connected by an open belt with no slip. Pulley A has radius 0.200 m and "
-            "rotates at Ï‰_A = 12 rad/s. Pulley B has radius 0.125 m. Determine the angular velocity of B."
+            "rotates at \u03c9_A = 12 rad/s. Pulley B has radius 0.125 m. Determine the angular velocity of B."
         ),
-        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "Ï‰_A = 12 rad/s", "Open belt, no slip"],
+        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "\u03c9_A = 12 rad/s", "Open belt, no slip"],
         "direction_questions": [
             {
                 "q": "For an open belt, pulley B rotates:",
@@ -516,17 +582,17 @@ PROBLEMS = [
             {
                 "q": "Choose the correct no-slip velocity relation.",
                 "options": [
-                    "Ï‰_A = Ï‰_B",
-                    "Ï‰_A / r_A = Ï‰_B / r_B",
-                    "Ï‰_A r_A = Ï‰_B r_B",
-                    "Ï‰_A r_B = Ï‰_B r_AÂ²",
+                    "\u03c9_A = \u03c9_B",
+                    "\u03c9_A / r_A = \u03c9_B / r_B",
+                    "\u03c9_A r_A = \u03c9_B r_B",
+                    "\u03c9_A r_B = \u03c9_B r_A\u00b2",
                 ],
-                "correct": "Ï‰_A r_A = Ï‰_B r_B",
-                "why": "Equal tangential speeds give Ï‰_A r_A = Ï‰_B r_B."
+                "correct": "\u03c9_A r_A = \u03c9_B r_B",
+                "why": "Equal tangential speeds give \u03c9_A r_A = \u03c9_B r_B."
             }
         ],
         "solve_outputs": [
-            {"label": "Angular velocity Ï‰_B", "key": "omegaB", "value": 19.2, "tol": 0.05, "unit": "rad/s"},
+            {"label": "Angular velocity \u03c9_B", "key": "omegaB", "value": 19.2, "tol": 0.05, "unit": "rad/s"},
         ],
         "solution_lines": [
             r"\omega_A r_A=\omega_B r_B",
@@ -547,7 +613,7 @@ PROBLEMS = [
             "which has 30 teeth. Gear C drives gear D with 90 teeth. If gear A rotates at 18 rad/s clockwise, "
             "determine the angular velocity magnitude of gear D."
         ),
-        "givens": ["N_A = 20", "N_B = 60", "N_C = 30", "N_D = 90", "Ï‰_A = 18 rad/s clockwise"],
+        "givens": ["N_A = 20", "N_B = 60", "N_C = 30", "N_D = 90", "\u03c9_A = 18 rad/s clockwise"],
         "direction_questions": [
             {
                 "q": "External meshing gears rotate in:",
@@ -569,20 +635,20 @@ PROBLEMS = [
                     "Radius necessarily",
                 ],
                 "correct": "Angular velocity",
-                "why": "If they are on the same shaft, they rotate together with the same Ï‰."
+                "why": "If they are on the same shaft, they rotate together with the same \u03c9."
             }
         ],
         "equation_questions": [
             {
                 "q": "Choose the correct gear-speed relationship for one external mesh.",
                 "options": [
-                    "Ï‰_1 N_1 = Ï‰_2 N_2",
-                    "Ï‰_1 / N_1 = Ï‰_2 / N_2",
-                    "Ï‰_1 N_2 = Ï‰_2 / N_1",
-                    "Ï‰_1 = Ï‰_2 always",
+                    "\u03c9_1 N_1 = \u03c9_2 N_2",
+                    "\u03c9_1 / N_1 = \u03c9_2 / N_2",
+                    "\u03c9_1 N_2 = \u03c9_2 / N_1",
+                    "\u03c9_1 = \u03c9_2 always",
                 ],
-                "correct": "Ï‰_1 N_1 = Ï‰_2 N_2",
-                "why": "Equal tangential speeds at meshing pitch circles give Ï‰_1 r_1 = Ï‰_2 r_2. With proportional tooth counts, Ï‰_1 N_1 = Ï‰_2 N_2."
+                "correct": "\u03c9_1 N_1 = \u03c9_2 N_2",
+                "why": "Equal tangential speeds at meshing pitch circles give \u03c9_1 r_1 = \u03c9_2 r_2. With proportional tooth counts, \u03c9_1 N_1 = \u03c9_2 N_2."
             }
         ],
         "solve_outputs": [
@@ -604,11 +670,11 @@ PROBLEMS = [
         "difficulty": "Foundation",
         "diagram": "fixed_acceleration",
         "description": (
-            "A disk rotates about a fixed axis. At point P on the rim, r = 0.30 m, Ï‰ = 6 rad/s and "
-            "Î± = 4 rad/sÂ² at the instant shown. Determine the tangential acceleration, normal acceleration, "
+            "A disk rotates about a fixed axis. At point P on the rim, r = 0.30 m, \u03c9 = 6 rad/s and "
+            "\u03b1 = 4 rad/s\u00b2 at the instant shown. Determine the tangential acceleration, normal acceleration, "
             "and resultant acceleration of point P."
         ),
-        "givens": ["r = 0.30 m", "Ï‰ = 6 rad/s", "Î± = 4 rad/sÂ²"],
+        "givens": ["r = 0.30 m", "\u03c9 = 6 rad/s", "\u03b1 = 4 rad/s\u00b2"],
         "direction_questions": [
             {
                 "q": "Tangential acceleration acts:",
@@ -637,26 +703,26 @@ PROBLEMS = [
             {
                 "q": "Choose the correct formulas.",
                 "options": [
-                    "a_t = Ï‰r and a_n = Î±r",
-                    "a_t = Î±r and a_n = Ï‰Â²r",
-                    "a_t = Ï‰Â²r and a_n = Î±r",
-                    "a_t = v/r and a_n = Î±Â²r",
+                    "a_t = \u03c9r and a_n = \u03b1r",
+                    "a_t = \u03b1r and a_n = \u03c9\u00b2r",
+                    "a_t = \u03c9\u00b2r and a_n = \u03b1r",
+                    "a_t = v/r and a_n = \u03b1\u00b2r",
                 ],
-                "correct": "a_t = Î±r and a_n = Ï‰Â²r",
-                "why": "Tangential acceleration depends on Î±, while normal acceleration depends on Ï‰Â²."
+                "correct": "a_t = \u03b1r and a_n = \u03c9\u00b2r",
+                "why": "Tangential acceleration depends on \u03b1, while normal acceleration depends on \u03c9\u00b2."
             }
         ],
         "solve_outputs": [
-            {"label": "Tangential acceleration a_t", "key": "at", "value": 1.2, "tol": 0.02, "unit": "m/sÂ²"},
-            {"label": "Normal acceleration a_n", "key": "an", "value": 10.8, "tol": 0.03, "unit": "m/sÂ²"},
-            {"label": "Resultant acceleration |a|", "key": "ares", "value": 10.8665, "tol": 0.03, "unit": "m/sÂ²"},
+            {"label": "Tangential acceleration a_t", "key": "at", "value": 1.2, "tol": 0.02, "unit": "m/s\u00b2"},
+            {"label": "Normal acceleration a_n", "key": "an", "value": 10.8, "tol": 0.03, "unit": "m/s\u00b2"},
+            {"label": "Resultant acceleration |a|", "key": "ares", "value": 10.8665, "tol": 0.03, "unit": "m/s\u00b2"},
         ],
         "solution_lines": [
             r"a_t=\alpha r=(4)(0.30)=1.20\ \text{m/s}^2",
             r"a_n=\omega^2 r=(6^2)(0.30)=10.8\ \text{m/s}^2",
             r"|a|=\sqrt{a_t^2+a_n^2}=\sqrt{1.20^2+10.8^2}=10.87\ \text{m/s}^2",
         ],
-        "teaching_point": "Even if Î± were zero, the normal component could still exist because it depends on Ï‰Â².",
+        "teaching_point": "Even if \u03b1 were zero, the normal component could still exist because it depends on \u03c9\u00b2.",
     },
     {
         "id": "A2",
@@ -666,12 +732,12 @@ PROBLEMS = [
         "difficulty": "Moderate",
         "diagram": "slider_acceleration",
         "description": (
-            "Link AB has length 0.50 m and is inclined 30Â° above the horizontal. Point A moves horizontally "
+            "Link AB has length 0.50 m and is inclined 30\u00b0 above the horizontal. Point A moves horizontally "
             "to the right at a constant speed of 1.0 m/s, so a_A = 0. Point B is constrained to move vertically. "
             "Complete the velocity step first, then determine the angular acceleration of the link and the acceleration of B. "
             "Use counterclockwise positive and upward positive."
         ),
-        "givens": ["AB = 0.50 m", "Î¸ = 30Â°", "v_A = 1.0 m/s constant", "a_A = 0", "B is a vertical slider"],
+        "givens": ["AB = 0.50 m", "\u03b8 = 30\u00b0", "v_A = 1.0 m/s constant", "a_A = 0", "B is a vertical slider"],
         "direction_questions": [
             {
                 "q": "The relative normal acceleration of B with respect to A points:",
@@ -688,30 +754,30 @@ PROBLEMS = [
                 "q": "Before doing acceleration analysis, what must be found first?",
                 "options": [
                     "The kinetic energy",
-                    "The velocity analysis and angular velocity Ï‰",
+                    "The velocity analysis and angular velocity \u03c9",
                     "The moment of inertia",
                     "The work done by the link",
                 ],
-                "correct": "The velocity analysis and angular velocity Ï‰",
-                "why": "The normal term uses Ï‰Â², so the velocity analysis must be done first."
+                "correct": "The velocity analysis and angular velocity \u03c9",
+                "why": "The normal term uses \u03c9\u00b2, so the velocity analysis must be done first."
             }
         ],
         "equation_questions": [
             {
                 "q": "Choose the correct relative-acceleration equation.",
                 "options": [
-                    "a_B = a_A + Î± Ã— r_B/A - Ï‰Â² r_B/A",
-                    "a_B = v_A + Î± Ã— r_B/A - Ï‰Â² r_B/A",
-                    "a_B = a_A + Ï‰ Ã— r_B/A",
-                    "a_B = Î±r_B/A",
+                    "a_B = a_A + \u03b1 \u00d7 r_B/A - \u03c9\u00b2 r_B/A",
+                    "a_B = v_A + \u03b1 \u00d7 r_B/A - \u03c9\u00b2 r_B/A",
+                    "a_B = a_A + \u03c9 \u00d7 r_B/A",
+                    "a_B = \u03b1r_B/A",
                 ],
-                "correct": "a_B = a_A + Î± Ã— r_B/A - Ï‰Â² r_B/A",
+                "correct": "a_B = a_A + \u03b1 \u00d7 r_B/A - \u03c9\u00b2 r_B/A",
                 "why": "For a rigid body in plane motion, acceleration has tangential and normal relative terms."
             }
         ],
         "solve_outputs": [
-            {"label": "Angular acceleration Î±_AB (CCW positive)", "key": "alphaAB", "value": -27.7128, "tol": 0.05, "unit": "rad/sÂ²"},
-            {"label": "Acceleration of B (upward positive)", "key": "aB", "value": -16.0, "tol": 0.05, "unit": "m/sÂ²"},
+            {"label": "Angular acceleration \u03b1_AB (CCW positive)", "key": "alphaAB", "value": -27.7128, "tol": 0.05, "unit": "rad/s\u00b2"},
+            {"label": "Acceleration of B (upward positive)", "key": "aB", "value": -16.0, "tol": 0.05, "unit": "m/s\u00b2"},
         ],
         "vector_lines": [
             r"\mathbf r_{B/A}=0.50(\cos30^\circ\,\mathbf i+\sin30^\circ\,\mathbf j)=(0.433\,\mathbf i+0.250\,\mathbf j)\ \text{m}",
@@ -737,11 +803,11 @@ PROBLEMS = [
         "diagram": "belt_acceleration",
         "description": (
             "A twisted belt connects wheel A and pulley B without slip, so the pulleys rotate in opposite directions. "
-            "Wheel A has radius 0.200 m and starts from rest with constant angular acceleration Î±_A = 3 rad/sÂ². "
-            "Pulley B has radius 0.125 m. Determine Ï‰_B, Î±_B, and the tangential and normal acceleration components "
+            "Wheel A has radius 0.200 m and starts from rest with constant angular acceleration \u03b1_A = 3 rad/s\u00b2. "
+            "Pulley B has radius 0.125 m. Determine \u03c9_B, \u03b1_B, and the tangential and normal acceleration components "
             "of a point P on the rim of B at t = 3 s."
         ),
-        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "Î±_A = 3 rad/sÂ²", "Ï‰_A(0)=0", "t = 3 s", "Twisted belt, no slip"],
+        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "\u03b1_A = 3 rad/s\u00b2", "\u03c9_A(0)=0", "t = 3 s", "Twisted belt, no slip"],
         "direction_questions": [
             {
                 "q": "For a twisted belt, pulley B rotates:",
@@ -770,20 +836,20 @@ PROBLEMS = [
             {
                 "q": "Choose the correct no-slip tangential-acceleration relation.",
                 "options": [
-                    "Ï‰_AÂ²r_A = Ï‰_BÂ²r_B",
-                    "Î±_A r_A = Î±_B r_B",
-                    "Î±_A = Î±_B",
+                    "\u03c9_A\u00b2r_A = \u03c9_B\u00b2r_B",
+                    "\u03b1_A r_A = \u03b1_B r_B",
+                    "\u03b1_A = \u03b1_B",
                     "a_nA = a_nB",
                 ],
-                "correct": "Î±_A r_A = Î±_B r_B",
+                "correct": "\u03b1_A r_A = \u03b1_B r_B",
                 "why": "Tangential acceleration is the transferred quantity in a no-slip belt."
             }
         ],
         "solve_outputs": [
             {"label": "Angular speed magnitude of pulley B at t = 3 s", "key": "omegaB", "value": 14.4, "tol": 0.05, "unit": "rad/s"},
-            {"label": "Angular acceleration magnitude of pulley B", "key": "alphaB", "value": 4.8, "tol": 0.03, "unit": "rad/sÂ²"},
-            {"label": "Tangential acceleration of point P on B", "key": "at", "value": 0.6, "tol": 0.02, "unit": "m/sÂ²"},
-            {"label": "Normal acceleration of point P on B", "key": "an", "value": 25.92, "tol": 0.05, "unit": "m/sÂ²"},
+            {"label": "Angular acceleration magnitude of pulley B", "key": "alphaB", "value": 4.8, "tol": 0.03, "unit": "rad/s\u00b2"},
+            {"label": "Tangential acceleration of point P on B", "key": "at", "value": 0.6, "tol": 0.02, "unit": "m/s\u00b2"},
+            {"label": "Normal acceleration of point P on B", "key": "an", "value": 25.92, "tol": 0.05, "unit": "m/s\u00b2"},
         ],
         "solution_lines": [
             r"\omega_A=\alpha_A t=(3)(3)=9\ \text{rad/s}",
@@ -803,12 +869,12 @@ PROBLEMS = [
         "diagram": "linked_acceleration",
         "description": (
             "Link AB is horizontal and link BC is vertical, with lengths AB = 2 m and BC = 2 m. "
-            "From the velocity step, slider C is known to move down a 45Â° groove at 8 m/s, giving "
-            "Ï‰_AB = -2.828 rad/s and Ï‰_BC = 2.828 rad/s at this instant. If slider C now has acceleration "
-            "3.0 m/sÂ² down the same 45Â° groove, determine the angular accelerations Î±_AB and Î±_BC. "
+            "From the velocity step, slider C is known to move down a 45\u00b0 groove at 8 m/s, giving "
+            "\u03c9_AB = -2.828 rad/s and \u03c9_BC = 2.828 rad/s at this instant. If slider C now has acceleration "
+            "3.0 m/s\u00b2 down the same 45\u00b0 groove, determine the angular accelerations \u03b1_AB and \u03b1_BC. "
             "Use counterclockwise as positive."
         ),
-        "givens": ["AB = 2 m", "BC = 2 m", "Ï‰_AB = -2.828 rad/s", "Ï‰_BC = 2.828 rad/s", "a_C = 3 m/sÂ² down 45Â° groove"],
+        "givens": ["AB = 2 m", "BC = 2 m", "\u03c9_AB = -2.828 rad/s", "\u03c9_BC = 2.828 rad/s", "a_C = 3 m/s\u00b2 down 45\u00b0 groove"],
         "direction_questions": [
             {
                 "q": "The relative normal acceleration of point C with respect to B on link BC points:",
@@ -824,31 +890,31 @@ PROBLEMS = [
             {
                 "q": "Why is the velocity step needed before the acceleration step?",
                 "options": [
-                    "Because Î± depends on kinetic energy",
-                    "Because the normal terms use the known angular velocities Ï‰",
+                    "Because \u03b1 depends on kinetic energy",
+                    "Because the normal terms use the known angular velocities \u03c9",
                     "Because it makes the drawing prettier",
                     "Because only velocity gives the link lengths",
                 ],
-                "correct": "Because the normal terms use the known angular velocities Ï‰",
-                "why": "The normal relative acceleration terms contain Ï‰Â²."
+                "correct": "Because the normal terms use the known angular velocities \u03c9",
+                "why": "The normal relative acceleration terms contain \u03c9\u00b2."
             }
         ],
         "equation_questions": [
             {
                 "q": "Choose the correct relative-acceleration equation for link BC.",
                 "options": [
-                    "a_C = a_B + Î±_BC Ã— r_C/B - Ï‰_BCÂ² r_C/B",
-                    "a_C = v_B + Î±_BC Ã— r_C/B - Ï‰_BCÂ² r_C/B",
-                    "a_C = a_B + Ï‰_BC Ã— r_C/B",
-                    "a_C = Î±_BC r_C/B only",
+                    "a_C = a_B + \u03b1_BC \u00d7 r_C/B - \u03c9_BC\u00b2 r_C/B",
+                    "a_C = v_B + \u03b1_BC \u00d7 r_C/B - \u03c9_BC\u00b2 r_C/B",
+                    "a_C = a_B + \u03c9_BC \u00d7 r_C/B",
+                    "a_C = \u03b1_BC r_C/B only",
                 ],
-                "correct": "a_C = a_B + Î±_BC Ã— r_C/B - Ï‰_BCÂ² r_C/B",
+                "correct": "a_C = a_B + \u03b1_BC \u00d7 r_C/B - \u03c9_BC\u00b2 r_C/B",
                 "why": "You need both the tangential and normal relative terms."
             }
         ],
         "solve_outputs": [
-            {"label": "Angular acceleration Î±_AB (CCW positive)", "key": "alphaAB", "value": -9.0607, "tol": 0.04, "unit": "rad/sÂ²"},
-            {"label": "Angular acceleration Î±_BC (CCW positive)", "key": "alphaBC", "value": 9.0607, "tol": 0.04, "unit": "rad/sÂ²"},
+            {"label": "Angular acceleration \u03b1_AB (CCW positive)", "key": "alphaAB", "value": -9.0607, "tol": 0.04, "unit": "rad/s\u00b2"},
+            {"label": "Angular acceleration \u03b1_BC (CCW positive)", "key": "alphaBC", "value": 9.0607, "tol": 0.04, "unit": "rad/s\u00b2"},
         ],
         "vector_lines": [
             r"\mathbf a_C=3(\cos45^\circ\,\mathbf i-\sin45^\circ\,\mathbf j)=(2.121\,\mathbf i-2.121\,\mathbf j)\ \text{m/s}^2",
@@ -869,6 +935,67 @@ PROBLEMS = [
         "teaching_point": "The clean method is always the same: velocity first, identify constraints, then acceleration with tangential and normal components.",
     },
 ]
+
+
+def validate_problem_catalog():
+    """Validate all ten instructional states and their independent targets."""
+    expected_ids = ["V1", "V2", "V3", "V4", "V5", "V6", "A1", "A2", "A3", "A4"]
+    actual_ids = [problem["id"] for problem in PROBLEMS]
+    if actual_ids != expected_ids:
+        raise RuntimeError("Problem catalog mismatch: " + repr(actual_ids))
+
+    supported_diagrams = {
+        "fixed_velocity", "slider_velocity", "linked_velocity", "ic_velocity",
+        "belt_velocity", "gear_train", "fixed_acceleration", "slider_acceleration",
+        "belt_acceleration", "linked_acceleration",
+    }
+    for problem in PROBLEMS:
+        if problem["diagram"] not in supported_diagrams:
+            raise RuntimeError("Unsupported diagram for " + problem["id"])
+        if not problem["description"] or not problem["solution_lines"]:
+            raise RuntimeError("Incomplete problem state for " + problem["id"])
+        for group_name in ("direction_questions", "equation_questions"):
+            for item in problem[group_name]:
+                if item["correct"] not in item["options"]:
+                    raise RuntimeError("Invalid answer key in " + problem["id"])
+        for output in problem["solve_outputs"]:
+            if not math.isfinite(float(output["value"])) or float(output["tol"]) <= 0:
+                raise RuntimeError("Invalid numeric target in " + problem["id"])
+
+    root2 = math.sqrt(2.0)
+    root3 = math.sqrt(3.0)
+    independent_targets = {
+        "V1": [6.0 * 0.30],
+        "V2": [2.0 / (0.50 * 0.50), 8.0 * 0.50 * root3 / 2.0],
+        "V3": [-8.0 / (2.0 * root2), 8.0 / (2.0 * root2)],
+        "V4": [1.9596, 1.3384],
+        "V5": [12.0 * 0.200 / 0.125],
+        "V6": [18.0 * 20.0 / 60.0 * 30.0 / 90.0],
+        "A1": [4.0 * 0.30, 6.0 ** 2 * 0.30, math.hypot(4.0 * 0.30, 6.0 ** 2 * 0.30)],
+        "A2": [-16.0 * (0.50 * root3 / 2.0) / (0.50 * 0.50), -16.0],
+        "A3": [3.0 * 3.0 * 0.200 / 0.125, 3.0 * 0.200 / 0.125, 3.0 * 0.200,
+               (3.0 * 3.0 * 0.200 / 0.125) ** 2 * 0.125],
+        "A4": [(-2.1213203436 - 16.0) / 2.0, (2.1213203436 + 16.0) / 2.0],
+    }
+    for problem in PROBLEMS:
+        stored = [float(item["value"]) for item in problem["solve_outputs"]]
+        computed = independent_targets[problem["id"]]
+        if len(stored) != len(computed):
+            raise RuntimeError("Target count mismatch for " + problem["id"])
+        for stored_value, computed_value in zip(stored, computed):
+            if abs(stored_value - computed_value) > 0.001:
+                raise RuntimeError(
+                    "Independent target check failed for " + problem["id"] +
+                    ": stored=" + repr(stored_value) + ", computed=" + repr(computed_value)
+                )
+
+    findings = _find_text_corruption(PROBLEMS, "PROBLEMS")
+    if findings:
+        raise RuntimeError("Runtime encoding check failed: " + "; ".join(findings[:8]))
+    return True
+
+
+validate_problem_catalog()
 
 
 def get_problem(topic, level):
@@ -968,37 +1095,51 @@ def draw_fixed_acceleration():
 
 
 def draw_slider_velocity(accel=False):
-    fig, ax = plt.subplots(figsize=(7.6, 3.8))
-    A = np.array([0.4, 0.5])
-    L = 2.5
-    theta = math.radians(30)
-    B = A + L * np.array([math.cos(theta), math.sin(theta)])
-    # slider
-    ax.plot([B[0]-0.25, B[0]-0.25], [B[1]-1.1, B[1]+1.1], color=COLORS["guide"], lw=2)
-    ax.plot([B[0]+0.25, B[0]+0.25], [B[1]-1.1, B[1]+1.1], color=COLORS["guide"], lw=2)
-    ax.add_patch(Rectangle((B[0]-0.18, B[1]-0.26), 0.36, 0.52, fill=False, ec=COLORS["link"], lw=2))
-    # link
-    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.4)
-    ax.plot(*A, 'o', color='black', ms=6)
-    ax.plot(*B, 'o', color='black', ms=6)
-    ax.text(A[0]-0.12, A[1]-0.28, "A", fontsize=11, weight='bold')
-    ax.text(B[0]+0.12, B[1]+0.05, "B", fontsize=11, weight='bold')
-    ax.text((A[0]+B[0])/2-0.1, (A[1]+B[1])/2+0.20, "AB", color=COLORS["link"], fontsize=10)
-    draw_arrow(ax, A + np.array([-0.05, 0.38]), A + np.array([0.95, 0.38]), COLORS["known"], r"$v_A$")
+    fig, ax = plt.subplots(figsize=(7.8, 4.2))
+    A = np.array([0.35, 0.55])
+    length = 2.55
+    theta = math.radians(30.0)
+    B = A + length * np.array([math.cos(theta), math.sin(theta)])
+    note = "#0f8b8d"
+
+    # Vertical guide and slider.
+    ax.plot([B[0] - 0.28, B[0] - 0.28], [B[1] - 1.15, B[1] + 1.15], color=COLORS["guide"], lw=2)
+    ax.plot([B[0] + 0.28, B[0] + 0.28], [B[1] - 1.15, B[1] + 1.15], color=COLORS["guide"], lw=2)
+    ax.add_patch(Rectangle((B[0] - 0.19, B[1] - 0.27), 0.38, 0.54, fill=False, ec=COLORS["link"], lw=2))
+
+    # Link, joints, horizontal reference, angle arc, and dimension.
+    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.8)
+    ax.plot(*A, "o", color="black", ms=7)
+    ax.plot(*B, "o", color="black", ms=7)
+    ax.text(A[0] - 0.14, A[1] - 0.28, "A", fontsize=11, weight="bold")
+    ax.text(B[0] + 0.12, B[1] + 0.06, "B", fontsize=11, weight="bold")
+    ax.plot([A[0], A[0] + 1.18], [A[1], A[1]], color=COLORS["construct"], lw=1.4, ls="--")
+    angle_arc = np.linspace(0.0, theta, 60)
+    ax.plot(A[0] + 0.58 * np.cos(angle_arc), A[1] + 0.58 * np.sin(angle_arc), color=COLORS["tangent"], lw=2)
+    ax.text(A[0] + 0.70, A[1] + 0.12, "30\u00b0", fontsize=10, color=COLORS["tangent"])
+    midpoint = (A + B) / 2
+    ax.text(midpoint[0] - 0.03, midpoint[1] + 0.23, "0.50 m", fontsize=10, color=COLORS["link"], rotation=30)
+    ax.text(0.05, 2.48, "Positive angular sense: CCW", color=note, fontsize=9.4,
+            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=note, alpha=0.95))
+    ax.text(B[0] - 0.68, 0.24, "Slider motion is vertical.", color=note, fontsize=9.2,
+            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=note, alpha=0.95))
+
     if not accel:
-        draw_arrow(ax, B + np.array([0.55, -0.15]), B + np.array([0.55, 1.0]), COLORS["known"], r"$v_B$")
-        mid = (A + B) / 2
-        perp = np.array([-math.sin(theta), math.cos(theta)])
-        draw_arrow(ax, mid + np.array([0.18, -0.22]), mid + np.array([0.18, -0.22]) + 0.9 * perp, COLORS["relative"], r"$v_{B/A}$")
+        draw_arrow(ax, A + np.array([-0.05, -0.30]), A + np.array([1.02, -0.30]), COLORS["known"], r"$v_A$")
+        draw_arrow(ax, B + np.array([0.55, -0.12]), B + np.array([0.55, 1.02]), COLORS["known"], r"$v_B$")
+        perpendicular = np.array([-math.sin(theta), math.cos(theta)])
+        draw_arrow(ax, midpoint + np.array([0.12, -0.15]), midpoint + np.array([0.12, -0.15]) + 0.92 * perpendicular,
+                   COLORS["relative"], r"$v_{B/A}$")
     else:
-        draw_arrow(ax, B + np.array([0.62, 0.12]), B + np.array([0.62, -0.95]), COLORS["known"], r"$a_B$")
-        mid = (A + B) / 2
-        perp = np.array([-math.sin(theta), math.cos(theta)])
+        draw_arrow(ax, B + np.array([0.58, 0.18]), B + np.array([0.58, -0.95]), COLORS["known"], r"$a_B$")
+        perpendicular = np.array([-math.sin(theta), math.cos(theta)])
         toward_A = (A - B) / np.linalg.norm(A - B)
-        draw_arrow(ax, mid + np.array([0.30, 0.05]), mid + np.array([0.30, 0.05]) + 0.82 * perp, COLORS["tangent"], r"$a^t_{B/A}$")
-        draw_arrow(ax, B + np.array([-0.08, -0.05]), B + np.array([-0.08, -0.05]) + 0.9 * toward_A, COLORS["normal"], r"$a^n_{B/A}$")
-    ax.text(A[0]+0.55, A[1]-0.38, r"$30^\circ$", fontsize=10)
-    finish_axis(ax, (-0.35, 3.65), (-0.35, 2.8))
+        draw_arrow(ax, midpoint + np.array([0.28, 0.05]), midpoint + np.array([0.28, 0.05]) + 0.82 * perpendicular,
+                   COLORS["tangent"], r"$a^t_{B/A}$")
+        draw_arrow(ax, B + np.array([-0.08, -0.05]), B + np.array([-0.08, -0.05]) + 0.92 * toward_A,
+                   COLORS["normal"], r"$a^n_{B/A}$")
+
+    finish_axis(ax, (-0.30, 3.80), (0.0, 2.85))
     return fig
 
 
@@ -1011,7 +1152,7 @@ def draw_linked_velocity(accel=False):
     # 45-degree groove
     ax.plot([2.2, 5.4], [1.9, -1.3], color=COLORS["guide"], lw=2)
     ax.plot([2.45, 5.65], [2.15, -1.05], color=COLORS["guide"], lw=2)
-    ax.text(4.55, -0.75, "45Â° groove", fontsize=10, color=COLORS["construct"])
+    ax.text(4.55, -0.75, "45\u00b0 groove", fontsize=10, color=COLORS["construct"])
 
     # links
     ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.8)
@@ -1077,8 +1218,8 @@ def draw_ic_velocity():
 
     ax.plot(*IC, 'o', color='black', ms=6)
     ax.text(IC[0]+0.10, IC[1]+0.02, "IC", fontsize=11.5, weight='bold', color=COLORS["construct"])
-    ax.text(C[0]+0.12, IC[1]-0.25, "line âŠ¥ to slider velocity", fontsize=8.6, color=COLORS["construct"])
-    ax.text(B[0]-1.1, B[1]+1.15, "line âŠ¥ to $v_B$", fontsize=8.6, color=COLORS["construct"])
+    ax.text(C[0]+0.12, IC[1]-0.25, "line $\\perp$ to slider velocity", fontsize=8.6, color=COLORS["construct"])
+    ax.text(B[0]-1.1, B[1]+1.15, "line $\\perp$ to $v_B$", fontsize=8.6, color=COLORS["construct"])
 
     ax.plot([IC[0], B[0]], [IC[1], B[1]], color=COLORS["guide"], lw=1.9)
     ax.plot([IC[0], C[0]], [IC[1], C[1]], color=COLORS["guide"], lw=1.9)
@@ -1108,7 +1249,7 @@ def draw_belt_velocity(accel=False):
         ax.plot([topA[0], topB[0]], [topA[1], topB[1]], color=COLORS["guide"], lw=2.6)
         ax.plot([botA[0], botB[0]], [botA[1], botB[1]], color=COLORS["guide"], lw=2.6)
         ax.text(3.55, 3.35, "open belt", fontsize=10.2, color=COLORS["construct"])
-        ax.text(3.25, 3.05, "same belt speed  v = Ï‰_A r_A = Ï‰_B r_B", fontsize=9.2, color=COLORS["construct"])
+        ax.text(3.25, 3.05, "same belt speed  v = \u03c9_A r_A = \u03c9_B r_B", fontsize=9.2, color=COLORS["construct"])
         ax.text(3.55, 0.82, "same rotation direction", fontsize=9.0, color=COLORS["construct"])
         draw_arrow(ax, np.array([3.25, 3.00]), np.array([4.35, 3.00]), COLORS["relative"], None, lw=2.0)
         draw_arrow(ax, np.array([4.95, 1.32]), np.array([3.85, 1.32]), COLORS["relative"], None, lw=2.0)
@@ -1118,7 +1259,7 @@ def draw_belt_velocity(accel=False):
         ax.plot([A[0], B[0]], [A[1]+rA, B[1]-rB], color=COLORS["guide"], lw=2.6)
         ax.plot([A[0], B[0]], [A[1]-rA, B[1]+rB], color=COLORS["guide"], lw=2.6)
         ax.text(3.45, 3.40, "crossed belt", fontsize=10.2, color=COLORS["construct"])
-        ax.text(3.00, 3.10, "same belt speed  v = Ï‰_A r_A = Ï‰_B r_B", fontsize=9.2, color=COLORS["construct"])
+        ax.text(3.00, 3.10, "same belt speed  v = \u03c9_A r_A = \u03c9_B r_B", fontsize=9.2, color=COLORS["construct"])
         ax.text(3.35, 0.72, "opposite rotation direction", fontsize=9.0, color=COLORS["construct"])
         draw_arrow(ax, np.array([3.10, 3.00]), np.array([4.30, 2.18]), COLORS["relative"], None, lw=2.0)
         draw_arrow(ax, np.array([4.95, 1.28]), np.array([3.75, 2.08]), COLORS["relative"], None, lw=2.0)
@@ -1152,41 +1293,47 @@ def draw_belt_velocity(accel=False):
 def draw_gear_train():
     fig, ax = plt.subplots(figsize=(8.8, 4.8))
     centers = {
-        "A": np.array([1.3, 3.2]),
-        "B": np.array([3.8, 3.2]),
-        "C": np.array([3.8, 1.2]),
-        "D": np.array([6.8, 1.2]),
+        "A": np.array([1.25, 2.35]),
+        "B": np.array([2.85, 2.35]),
+        "C": np.array([2.85, 2.35]),
+        "D": np.array([4.75, 2.35]),
     }
     radii = {"A": 0.55, "B": 1.05, "C": 0.65, "D": 1.25}
 
     for name in ["A", "B", "C", "D"]:
-        c = centers[name]
-        r = radii[name]
-        ax.add_patch(Circle(c, r, fill=False, ec=COLORS["link"], lw=2.4))
-        ax.text(c[0]-0.10, c[1]-0.08, name, fontsize=12, weight='bold')
+        centre = centers[name]
+        radius = radii[name]
+        ax.add_patch(Circle(centre, radius, fill=False, ec=COLORS["link"], lw=2.4))
 
-    # same shaft between B and C
-    ax.plot([3.8, 3.8], [2.12, 2.28], color='black', lw=3.2)
-    ax.text(4.22, 2.18, "same shaft", fontsize=9.5, color=COLORS["construct"])
+    # B and C share one shaft: same centre, same angular velocity.
+    ax.plot(*centers["B"], "o", color="black", ms=6)
+    ax.text(2.52, 2.90, "B", fontsize=12, weight="bold")
+    ax.text(3.05, 1.92, "C", fontsize=12, weight="bold")
+    ax.text(2.48, 2.28, "same shaft", fontsize=8.8, color=COLORS["construct"], ha="center")
+    ax.plot(*centers["A"], "o", color="black", ms=5)
+    ax.plot(*centers["D"], "o", color="black", ms=5)
+    ax.text(1.15, 2.27, "A", fontsize=12, weight="bold")
+    ax.text(4.65, 2.27, "D", fontsize=12, weight="bold")
 
-    # mesh labels, spaced away
-    ax.text(2.40, 4.15, "A meshes with B", fontsize=9.2, color=COLORS["construct"])
-    ax.text(5.30, 2.18, "C meshes with D", fontsize=9.2, color=COLORS["construct"])
+    # Pitch circles are tangent at both external meshes.
+    ax.plot([1.80, 1.80], [2.27, 2.43], color=COLORS["tangent"], lw=3)
+    ax.plot([3.50, 3.50], [2.27, 2.43], color=COLORS["tangent"], lw=3)
+    ax.text(1.64, 3.63, "A meshes with B", fontsize=9.2, color=COLORS["construct"])
+    ax.text(3.55, 3.63, "C meshes with D", fontsize=9.2, color=COLORS["construct"])
 
-    # direction arrows
-    draw_arrow(ax, centers["A"] + np.array([0.0, 0.70]), centers["A"] + np.array([0.40, 0.18]), COLORS["known"], r"$\omega_A$", lw=2)
-    draw_arrow(ax, centers["D"] + np.array([0.0, 1.35]), centers["D"] + np.array([0.42, 0.78]), COLORS["resultant"], r"$\omega_D$", lw=2)
+    draw_arrow(ax, centers["A"] + np.array([0.0, 0.72]), centers["A"] + np.array([0.42, 0.20]),
+               COLORS["known"], r"$\omega_A$", lw=2)
+    draw_arrow(ax, centers["D"] + np.array([0.0, 1.38]), centers["D"] + np.array([0.44, 0.80]),
+               COLORS["resultant"], r"$\omega_D$", lw=2)
 
-    # teeth counts below circles, clear and non-overlapping
-    ax.text(0.95, 2.25, "20 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(3.35, 1.85, "60 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(4.65, 0.05, "30 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(7.20, -0.12, "90 teeth", fontsize=9.3, color=COLORS["link"])
+    ax.text(0.82, 1.53, "20 teeth", fontsize=9.3, color=COLORS["link"])
+    ax.text(2.45, 3.48, "60 teeth", fontsize=9.3, color=COLORS["link"])
+    ax.text(2.45, 1.50, "30 teeth", fontsize=9.3, color=COLORS["link"])
+    ax.text(4.43, 0.93, "90 teeth", fontsize=9.3, color=COLORS["link"])
+    ax.text(0.72, 0.52, "External meshes reverse direction; B and C share the same \u03c9.",
+            fontsize=9.0, color=COLORS["construct"])
 
-    # notes on directions
-    ax.text(2.10, 0.10, "External gears reverse direction; gears on the same shaft share the same Ï‰.", fontsize=8.7, color=COLORS["construct"])
-
-    finish_axis(ax, (0.2, 8.1), (-0.35, 4.7))
+    finish_axis(ax, (0.25, 6.25), (0.25, 4.05))
     return fig
 
 
@@ -1273,12 +1420,12 @@ def render_learn_tab(topic):
             st.markdown("### When should students use each method?")
             st.markdown(
                 r"""
-                - **Pure translation** â†’ every point has the **same velocity vector**.  
-                - **Fixed-axis rotation** â†’ use \(v=\omega r\) at each point.  
-                - **Two points on one moving link** â†’ use the **relative-velocity equation**.  
-                - **Slider-link with known directions** â†’ the **IC method** is often fastest for velocity only.  
-                - **Belts / pulleys** â†’ use **equal tangential belt speed**.  
-                - **Gears** â†’ use **equal pitch-line speed** and the correct direction reversal.  
+                - **Pure translation** &#8594; every point has the **same velocity vector**.  
+                - **Fixed-axis rotation** &#8594; use \(v=\omega r\) at each point.  
+                - **Two points on one moving link** &#8594; use the **relative-velocity equation**.  
+                - **Slider-link with known directions** &#8594; the **IC method** is often fastest for velocity only.  
+                - **Belts / pulleys** &#8594; use **equal tangential belt speed**.  
+                - **Gears** &#8594; use **equal pitch-line speed** and the correct direction reversal.  
                 """
             )
 
@@ -1462,7 +1609,7 @@ def render_problem_tab(problem):
         st.caption(f"{problem['topic']} | Level {problem['level']} | Difficulty: {problem['difficulty']}")
         st.markdown(problem["description"])
         st.markdown(
-            "<div class='hint'><b>Given values</b><br>" + "<br>".join(f"â€¢ {g}" for g in problem["givens"]) + "</div>",
+            "<div class='hint'><b>Given values</b><br>" + "<br>".join(f"&#8226; {g}" for g in problem["givens"]) + "</div>",
             unsafe_allow_html=True,
         )
     with c2:
@@ -1520,7 +1667,7 @@ def render_solve_tab(problem, mode):
             if problem["id"] not in solved:
                 solved.add(problem["id"])
                 st.session_state["xp"] = st.session_state.get("xp", 0) + 40
-            st.success("Excellent â€” this mechanism is solved correctly.")
+            st.success("Excellent \u2014 this mechanism is solved correctly.")
         else:
             st.info("Keep going. Review the direction and equation tabs if needed.")
 
@@ -1593,6 +1740,7 @@ def sidebar_controls():
         "<div class='skill'>Current emphasis: method selection, vector direction, relative motion, and clean component equations.</div>",
         unsafe_allow_html=True,
     )
+    st.sidebar.caption("Build: " + APP_BUILD_ID)
 
     return mode, topic, level
 
