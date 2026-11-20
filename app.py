@@ -80,7 +80,7 @@ def load_logo_b64():
 
 
 LOGO_B64 = load_logo_b64()
-APP_BUILD_ID = "encoding-proof-2026-11-21-r1"
+APP_BUILD_ID = "encoding-proof-diagrams-2026-11-21-r2"
 
 COLORS = {
     "known": "#2563eb",      # blue
@@ -1006,362 +1006,621 @@ def get_problem(topic, level):
 
 
 def vector_legend_html(topic):
+    """Legend used only with worked-solution diagrams."""
     items = [
-        ("Known / absolute velocity or acceleration", COLORS["known"]),
-        ("Relative velocity", COLORS["relative"]),
+        ("Known / absolute motion", COLORS["known"]),
+        ("Relative motion", COLORS["relative"]),
         ("Tangential acceleration", COLORS["tangent"]),
         ("Normal acceleration", COLORS["normal"]),
-        ("Resultant / final answer", COLORS["resultant"]),
+        ("Resultant / final vector", COLORS["resultant"]),
     ]
     chips = "".join(
-        f'<span class="legend-chip"><span class="legend-box" style="background:{c}"></span>{label}</span>'
-        for label, c in items
+        f'<span class="legend-chip"><span class="legend-box" style="background:{colour}"></span>{label}</span>'
+        for label, colour in items
     )
     return f'<div class="legend-row">{chips}</div>'
 
 
-def draw_arrow(ax, start, end, color, label=None, lw=2.2, mutation=14, ls='-'):
+def draw_arrow(ax, start, end, color, label=None, lw=2.2, mutation=14,
+               ls="-", alpha=1.0, label_offset=(0.0, 0.10), zorder=5):
+    """Draw one labelled vector with its label offset from the shaft."""
+    start = np.asarray(start, dtype=float)
+    end = np.asarray(end, dtype=float)
     arrow = FancyArrowPatch(
-        start, end, arrowstyle='->', mutation_scale=mutation,
-        linewidth=lw, color=color, linestyle=ls
+        start, end, arrowstyle="->", mutation_scale=mutation,
+        linewidth=lw, color=color, linestyle=ls, alpha=alpha, zorder=zorder,
     )
     ax.add_patch(arrow)
     if label:
-        mx = (start[0] + end[0]) / 2
-        my = (start[1] + end[1]) / 2
-        ax.text(mx, my + 0.08, label, color=color, fontsize=10, weight='bold',
-                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.9))
+        midpoint = (start + end) / 2.0
+        ax.text(
+            midpoint[0] + label_offset[0], midpoint[1] + label_offset[1], label,
+            color=color, fontsize=10, weight="bold", ha="center", va="center",
+            bbox=dict(boxstyle="round,pad=0.14", fc="white", ec="none", alpha=0.78),
+            zorder=zorder + 1,
+        )
+    return arrow
 
 
-def finish_axis(ax, xlim, ylim):
-    # Explicit figure, axes and annotation colours prevent a locally selected
-    # Matplotlib dark style from turning labels or the canvas unreadable.
-    ax.figure.patch.set_facecolor("#ffffff")
-    ax.set_facecolor("#ffffff")
+def draw_rotation_arrow(ax, centre, radius, sense, color, label,
+                        start_deg=25.0, sweep_deg=245.0, label_offset=(0.0, 0.0),
+                        alpha=1.0):
+    """Draw a mathematically unambiguous CCW (+1) or CW (-1) curved arrow."""
+    centre = np.asarray(centre, dtype=float)
+    angles = np.radians(np.linspace(start_deg, start_deg + sense * sweep_deg, 100))
+    points = centre + radius * np.column_stack((np.cos(angles), np.sin(angles)))
+    ax.plot(points[:, 0], points[:, 1], color=color, lw=2.0, alpha=alpha, zorder=4)
+    draw_arrow(ax, points[-3], points[-1], color, lw=2.0, mutation=13,
+               alpha=alpha, zorder=5)
+    label_point = centre + np.array([0.0, radius + 0.18]) + np.asarray(label_offset)
+    ax.text(
+        label_point[0], label_point[1], label, color=color, fontsize=9.5,
+        weight="bold", ha="center", va="bottom",
+        bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none", alpha=0.76),
+        zorder=6,
+    )
+
+
+def draw_pin(ax, point, label, label_offset=(-0.12, -0.24), fixed=False):
+    """Draw a pin; optionally add a compact fixed-support symbol."""
+    point = np.asarray(point, dtype=float)
+    ax.plot(*point, "o", color="#111827", ms=6.5, zorder=6)
+    ax.text(point[0] + label_offset[0], point[1] + label_offset[1], label,
+            fontsize=11, weight="bold", zorder=7)
+    if fixed:
+        ax.plot([point[0] - 0.25, point[0], point[0] + 0.25],
+                [point[1] - 0.34, point[1] - 0.08, point[1] - 0.34],
+                color=COLORS["link"], lw=1.5, zorder=2)
+        ax.plot([point[0] - 0.34, point[0] + 0.34],
+                [point[1] - 0.35, point[1] - 0.35],
+                color=COLORS["guide"], lw=1.5, zorder=2)
+
+
+def draw_angle_arc(ax, vertex, radius, start_deg, end_deg, label,
+                   color=None, label_radius=None):
+    color = color or COLORS["construct"]
+    angles = np.radians(np.linspace(start_deg, end_deg, 60))
+    vertex = np.asarray(vertex, dtype=float)
+    ax.plot(vertex[0] + radius * np.cos(angles),
+            vertex[1] + radius * np.sin(angles), color=color, lw=1.7, zorder=3)
+    middle = math.radians((start_deg + end_deg) / 2.0)
+    rr = label_radius if label_radius is not None else radius + 0.18
+    ax.text(vertex[0] + rr * math.cos(middle),
+            vertex[1] + rr * math.sin(middle), label,
+            color=color, fontsize=9.5, ha="center", va="center", zorder=4)
+
+
+def finish_axis(ax, xlim, ylim, transparent=False):
+    """Apply consistent geometry, margins, and either opaque or transparent canvas."""
+    face = "none" if transparent else "#ffffff"
+    ax.figure.patch.set_facecolor(face)
+    ax.set_facecolor(face)
+    ax.figure.patch.set_alpha(0.0 if transparent else 1.0)
+    ax.patch.set_alpha(0.0 if transparent else 1.0)
     for label in ax.texts:
         if label.get_color() in (None, "auto", "black", "k", "#000000"):
             label.set_color("#0f172a")
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
-    ax.axis('off')
+    ax.axis("off")
+    ax.figure.tight_layout(pad=0.25)
 
 
-def draw_fixed_velocity():
-    fig, ax = plt.subplots(figsize=(7.3, 3.8))
-    center = np.array([0.0, 0.0])
-    R = 1.0
-    theta = math.radians(50)
-    P = np.array([R * math.cos(theta), R * math.sin(theta)])
-    ax.add_patch(Circle(center, R, fill=False, linewidth=2.0, edgecolor=COLORS["link"]))
-    ax.plot(*center, 'o', color='black', ms=5)
-    ax.text(center[0] - 0.08, center[1] - 0.18, "O", fontsize=11, weight="bold")
-    ax.plot(*P, 'o', color='black', ms=5)
-    ax.text(P[0] + 0.08, P[1] + 0.02, "P", fontsize=11, weight="bold")
-    ax.plot([center[0], P[0]], [center[1], P[1]], color=COLORS["guide"], linewidth=2)
-    ax.text(0.38, 0.42, "r", color=COLORS["guide"], fontsize=10)
-    tangent = np.array([-math.sin(theta), math.cos(theta)])
-    draw_arrow(ax, P, P + 0.55 * tangent, COLORS["known"], r"$v_P$")
-    arc = np.linspace(math.radians(310), math.radians(20), 80)
-    ax.plot(0.33 * np.cos(arc), 0.33 * np.sin(arc), color=COLORS["relative"], linewidth=2)
-    draw_arrow(ax, (0.33 * math.cos(math.radians(20)), 0.33 * math.sin(math.radians(20))),
-               (0.35 * math.cos(math.radians(12)), 0.35 * math.sin(math.radians(12))),
-               COLORS["relative"], r"$\omega$", lw=2)
-    finish_axis(ax, (-1.35, 1.95), (-1.2, 1.35))
-    return fig
-
-
-def draw_fixed_acceleration():
-    fig, ax = plt.subplots(figsize=(7.3, 3.8))
-    center = np.array([0.0, 0.0])
-    R = 1.0
-    theta = math.radians(55)
-    P = np.array([R * math.cos(theta), R * math.sin(theta)])
-    ax.add_patch(Circle(center, R, fill=False, linewidth=2.0, edgecolor=COLORS["link"]))
-    ax.plot(*center, 'o', color='black', ms=5)
-    ax.text(center[0] - 0.08, center[1] - 0.18, "O", fontsize=11, weight="bold")
-    ax.plot(*P, 'o', color='black', ms=5)
-    ax.text(P[0] + 0.08, P[1] + 0.04, "P", fontsize=11, weight="bold")
-    ax.plot([center[0], P[0]], [center[1], P[1]], color=COLORS["guide"], linewidth=2)
-    tangent = np.array([-math.sin(theta), math.cos(theta)])
-    radial_in = center - P
-    radial_in = radial_in / np.linalg.norm(radial_in)
-    draw_arrow(ax, P, P + 0.55 * tangent, COLORS["tangent"], r"$a_t$")
-    draw_arrow(ax, P, P + 0.62 * radial_in, COLORS["normal"], r"$a_n$")
-    resultant = 0.18 * tangent + 0.95 * radial_in
-    draw_arrow(ax, P, P + 0.72 * resultant, COLORS["resultant"], r"$a$")
-    finish_axis(ax, (-1.35, 2.05), (-1.25, 1.35))
-    return fig
-
-
-def draw_slider_velocity(accel=False):
-    fig, ax = plt.subplots(figsize=(7.8, 4.2))
+def _slider_geometry(ax):
     A = np.array([0.35, 0.55])
     length = 2.55
     theta = math.radians(30.0)
     B = A + length * np.array([math.cos(theta), math.sin(theta)])
-    note = "#0f8b8d"
-
-    # Vertical guide and slider.
-    ax.plot([B[0] - 0.28, B[0] - 0.28], [B[1] - 1.15, B[1] + 1.15], color=COLORS["guide"], lw=2)
-    ax.plot([B[0] + 0.28, B[0] + 0.28], [B[1] - 1.15, B[1] + 1.15], color=COLORS["guide"], lw=2)
-    ax.add_patch(Rectangle((B[0] - 0.19, B[1] - 0.27), 0.38, 0.54, fill=False, ec=COLORS["link"], lw=2))
-
-    # Link, joints, horizontal reference, angle arc, and dimension.
-    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.8)
-    ax.plot(*A, "o", color="black", ms=7)
-    ax.plot(*B, "o", color="black", ms=7)
-    ax.text(A[0] - 0.14, A[1] - 0.28, "A", fontsize=11, weight="bold")
-    ax.text(B[0] + 0.12, B[1] + 0.06, "B", fontsize=11, weight="bold")
-    ax.plot([A[0], A[0] + 1.18], [A[1], A[1]], color=COLORS["construct"], lw=1.4, ls="--")
-    angle_arc = np.linspace(0.0, theta, 60)
-    ax.plot(A[0] + 0.58 * np.cos(angle_arc), A[1] + 0.58 * np.sin(angle_arc), color=COLORS["tangent"], lw=2)
-    ax.text(A[0] + 0.70, A[1] + 0.12, "30\u00b0", fontsize=10, color=COLORS["tangent"])
-    midpoint = (A + B) / 2
-    ax.text(midpoint[0] - 0.03, midpoint[1] + 0.23, "0.50 m", fontsize=10, color=COLORS["link"], rotation=30)
-    ax.text(0.05, 2.48, "Positive angular sense: CCW", color=note, fontsize=9.4,
-            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=note, alpha=0.95))
-    ax.text(B[0] - 0.68, 0.24, "Slider motion is vertical.", color=note, fontsize=9.2,
-            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=note, alpha=0.95))
-
-    if not accel:
-        draw_arrow(ax, A + np.array([-0.05, -0.30]), A + np.array([1.02, -0.30]), COLORS["known"], r"$v_A$")
-        draw_arrow(ax, B + np.array([0.55, -0.12]), B + np.array([0.55, 1.02]), COLORS["known"], r"$v_B$")
-        perpendicular = np.array([-math.sin(theta), math.cos(theta)])
-        draw_arrow(ax, midpoint + np.array([0.12, -0.15]), midpoint + np.array([0.12, -0.15]) + 0.92 * perpendicular,
-                   COLORS["relative"], r"$v_{B/A}$")
-    else:
-        draw_arrow(ax, B + np.array([0.58, 0.18]), B + np.array([0.58, -0.95]), COLORS["known"], r"$a_B$")
-        perpendicular = np.array([-math.sin(theta), math.cos(theta)])
-        toward_A = (A - B) / np.linalg.norm(A - B)
-        draw_arrow(ax, midpoint + np.array([0.28, 0.05]), midpoint + np.array([0.28, 0.05]) + 0.82 * perpendicular,
-                   COLORS["tangent"], r"$a^t_{B/A}$")
-        draw_arrow(ax, B + np.array([-0.08, -0.05]), B + np.array([-0.08, -0.05]) + 0.92 * toward_A,
-                   COLORS["normal"], r"$a^n_{B/A}$")
-
-    finish_axis(ax, (-0.30, 3.80), (0.0, 2.85))
-    return fig
+    ax.plot([B[0] - 0.28, B[0] - 0.28], [B[1] - 1.08, B[1] + 1.08],
+            color=COLORS["guide"], lw=2.0, zorder=1)
+    ax.plot([B[0] + 0.28, B[0] + 0.28], [B[1] - 1.08, B[1] + 1.08],
+            color=COLORS["guide"], lw=2.0, zorder=1)
+    ax.add_patch(Rectangle((B[0] - 0.19, B[1] - 0.27), 0.38, 0.54,
+                           fill=False, ec=COLORS["link"], lw=2.0, zorder=3))
+    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.8, zorder=2)
+    draw_pin(ax, A, "A", (-0.15, -0.27))
+    draw_pin(ax, B, "B", (0.12, 0.05))
+    ax.plot([A[0], A[0] + 1.10], [A[1], A[1]], color=COLORS["construct"],
+            lw=1.2, ls="--", zorder=1)
+    draw_angle_arc(ax, A, 0.56, 0.0, 30.0, "30\u00b0", COLORS["construct"], 0.80)
+    midpoint = (A + B) / 2.0
+    ax.text(midpoint[0] - 0.03, midpoint[1] + 0.22, "AB = 0.50 m",
+            fontsize=9.7, color=COLORS["link"], rotation=30, ha="center")
+    ax.text(B[0] + 0.44, B[1] - 0.02, "vertical guide", fontsize=9.0,
+            color=COLORS["construct"], rotation=90, va="center")
+    return A, B, theta
 
 
-def draw_linked_velocity(accel=False):
-    fig, ax = plt.subplots(figsize=(8.6, 4.8))
+def _linked_geometry(ax):
     A = np.array([0.8, 3.1])
     B = np.array([3.6, 3.1])
     C = np.array([3.6, 0.5])
+    # Slider groove is drawn as two parallel rails; its centreline passes through C.
+    rail_x = np.array([2.45, 5.55])
+    centre_y = -rail_x + 4.10
+    offset = 0.17 * math.sqrt(2.0)
+    ax.plot(rail_x, centre_y + offset, color=COLORS["guide"], lw=2.0, zorder=1)
+    ax.plot(rail_x, centre_y - offset, color=COLORS["guide"], lw=2.0, zorder=1)
+    slider_angle = -45.0
+    ax.add_patch(Rectangle((C[0] - 0.23, C[1] - 0.14), 0.46, 0.28,
+                           angle=slider_angle, rotation_point="center",
+                           fill=False, ec=COLORS["link"], lw=1.8, zorder=3))
+    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.8, zorder=2)
+    ax.plot([B[0], C[0]], [B[1], C[1]], color=COLORS["link"], lw=2.8, zorder=2)
+    draw_pin(ax, A, "A", (-0.14, 0.15), fixed=True)
+    draw_pin(ax, B, "B", (0.10, 0.13))
+    draw_pin(ax, C, "C", (0.12, -0.05))
+    ax.text((A[0] + B[0]) / 2.0 + 0.52, A[1] + 0.28, "AB = 2 m",
+            fontsize=10.2, color=COLORS["link"], ha="center")
+    ax.text(B[0] - 0.34, (B[1] + C[1]) / 2.0, "BC = 2 m",
+            fontsize=10.2, color=COLORS["link"], rotation=90, va="center")
+    ax.plot([4.55, 5.15], [-0.58, -0.58], color=COLORS["construct"], lw=1.1, ls="--")
+    draw_angle_arc(ax, np.array([4.55, -0.58]), 0.42, 0.0, 45.0, "45\u00b0",
+                   COLORS["construct"], 0.66)
+    ax.text(4.62, -0.97, "inclined groove", fontsize=9.0, color=COLORS["construct"])
+    return A, B, C
 
-    # 45-degree groove
-    ax.plot([2.2, 5.4], [1.9, -1.3], color=COLORS["guide"], lw=2)
-    ax.plot([2.45, 5.65], [2.15, -1.05], color=COLORS["guide"], lw=2)
-    ax.text(4.55, -0.75, "45\u00b0 groove", fontsize=10, color=COLORS["construct"])
 
-    # links
+def _ic_geometry(ax):
+    scale = 6.0
+    A = np.array([0.65, 0.72])
+    B = A + (0.200 * scale) * np.array([math.cos(math.radians(45.0)), math.sin(math.radians(45.0))])
+    C = B + (0.500 * scale) * np.array([math.cos(math.radians(-30.0)), math.sin(math.radians(-30.0))])
     ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.8)
     ax.plot([B[0], C[0]], [B[1], C[1]], color=COLORS["link"], lw=2.8)
+    draw_pin(ax, A, "A", (-0.14, -0.27), fixed=True)
+    draw_pin(ax, B, "B", (0.10, 0.15))
+    draw_pin(ax, C, "C", (0.08, 0.20))
+    ax.plot([C[0] - 0.92, C[0] + 0.72], [C[1] - 0.22, C[1] - 0.22], color=COLORS["guide"], lw=2)
+    ax.plot([C[0] - 0.92, C[0] + 0.72], [C[1] + 0.22, C[1] + 0.22], color=COLORS["guide"], lw=2)
+    ax.add_patch(Rectangle((C[0] - 0.23, C[1] - 0.16), 0.46, 0.32,
+                           fill=False, ec=COLORS["link"], lw=2))
+    ax.text((A[0] + B[0]) / 2.0 + 0.12, (A[1] + B[1]) / 2.0 - 0.28,
+            "AB = 0.200 m", fontsize=9.5, color=COLORS["link"], rotation=45, ha="center")
+    ax.text((B[0] + C[0]) / 2.0, (B[1] + C[1]) / 2.0 + 0.28,
+            "BC = 0.500 m", fontsize=9.5, color=COLORS["link"], rotation=-30, ha="center")
+    ax.plot([A[0], A[0] + 0.75], [A[1], A[1]], color=COLORS["construct"], lw=1.1, ls="--")
+    draw_angle_arc(ax, A, 0.42, 0.0, 45.0, "45\u00b0", COLORS["construct"], 0.64)
+    ax.plot([B[0], B[0] + 0.78], [B[1], B[1]], color=COLORS["construct"], lw=1.1, ls="--")
+    draw_angle_arc(ax, B, 0.48, -30.0, 0.0, "30\u00b0", COLORS["construct"], 0.70)
+    ax.text(C[0] - 0.55, C[1] - 0.48, "horizontal guide", fontsize=8.9, color=COLORS["construct"])
+    return A, B, C
 
-    # joints
-    for pt, lab, dx, dy in [(A, "A", -0.14, 0.14), (B, "B", 0.08, 0.12), (C, "C", 0.08, -0.08)]:
-        ax.plot(*pt, 'o', color='black', ms=8)
-        ax.text(pt[0]+dx, pt[1]+dy, lab, fontsize=12, weight='bold')
 
-    # dimensions
-    ax.text(2.05, 3.35, "AB = 2 m", fontsize=11, color=COLORS["link"])
-    ax.text(3.82, 1.85, "BC = 2 m", fontsize=11, color=COLORS["link"], rotation=90, va='center')
-
-    if not accel:
-        draw_arrow(ax, B + np.array([0.62, 0.10]), B + np.array([0.62, -1.10]), COLORS["known"], r"$v_B$")
-        draw_arrow(ax, C + np.array([0.18, -0.04]), C + np.array([1.20, -1.06]), COLORS["known"], r"$v_C$")
-        # relative velocity perpendicular to BC, drawn clearly to the left
-        draw_arrow(ax, np.array([2.35, 1.80]), np.array([1.45, 1.80]), COLORS["relative"], r"$v_{C/B}$")
+def _belt_tangent_segments(A, rA, B, rB, crossed):
+    """Return exact external (open) or internal (crossed) tangent endpoints."""
+    A = np.asarray(A, dtype=float)
+    B = np.asarray(B, dtype=float)
+    distance = float(np.linalg.norm(B - A))
+    direction = (B - A) / distance
+    perpendicular = np.array([-direction[1], direction[0]])
+    segments = []
+    if crossed:
+        cosine = (rA + rB) / distance
+        sine = math.sqrt(max(0.0, 1.0 - cosine ** 2))
+        for sign in (1.0, -1.0):
+            normal = cosine * direction + sign * sine * perpendicular
+            segments.append((A + rA * normal, B - rB * normal))
     else:
-        draw_arrow(ax, B + np.array([0.62, 0.12]), B + np.array([0.62, -1.10]), COLORS["known"], r"$a_B$")
-        draw_arrow(ax, C + np.array([0.20, -0.04]), C + np.array([1.18, -1.02]), COLORS["known"], r"$a_C$")
-        # Tangential component leftward and separate
-        draw_arrow(ax, np.array([3.00, 2.05]), np.array([2.05, 2.05]), COLORS["tangent"], r"$a^t_{C/B}$")
-        # Normal component upward, toward B
-        draw_arrow(ax, np.array([2.40, 1.05]), np.array([2.40, 1.95]), COLORS["normal"], r"$a^n_{C/B}$")
-        ax.text(1.82, 2.32, "tangential", fontsize=8.8, color=COLORS["tangent"])
-        ax.text(2.48, 2.05, "toward B", fontsize=8.8, color=COLORS["normal"])
-
-    finish_axis(ax, (0.1, 6.1), (-1.35, 3.8))
-    return fig
+        cosine = (rA - rB) / distance
+        sine = math.sqrt(max(0.0, 1.0 - cosine ** 2))
+        for sign in (1.0, -1.0):
+            normal = cosine * direction + sign * sine * perpendicular
+            segments.append((A + rA * normal, B + rB * normal))
+    return segments
 
 
-def draw_ic_velocity():
-    fig, ax = plt.subplots(figsize=(8.2, 4.4))
-    A = np.array([0.8, 0.5])
-    B = A + 1.8 * np.array([math.cos(math.radians(45)), math.sin(math.radians(45))])
-    C = B + 2.8 * np.array([math.cos(math.radians(-30)), math.sin(math.radians(-30))])
-
-    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=2.7)
-    ax.plot([B[0], C[0]], [B[1], C[1]], color=COLORS["link"], lw=2.7)
-
-    ax.plot([C[0]-1.0, C[0]+0.7], [C[1]-0.22, C[1]-0.22], color=COLORS["guide"], lw=2)
-    ax.plot([C[0]-1.0, C[0]+0.7], [C[1]+0.22, C[1]+0.22], color=COLORS["guide"], lw=2)
-    ax.add_patch(Rectangle((C[0]-0.23, C[1]-0.16), 0.46, 0.32, fill=False, ec=COLORS["link"], lw=2))
-    ax.text(C[0]-0.6, C[1]+0.38, "horizontal slider", fontsize=9, color=COLORS["construct"])
-
-    for pt, lab, dx, dy in [(A, "A", -0.12, -0.24), (B, "B", 0.07, 0.08), (C, "C", 0.06, 0.22)]:
-        ax.plot(*pt, 'o', color='black', ms=7)
-        ax.text(pt[0]+dx, pt[1]+dy, lab, fontsize=12, weight='bold')
-
-    ax.text((A[0]+B[0])/2-0.18, (A[1]+B[1])/2+0.24, "AB = 0.200 m", fontsize=10, color=COLORS["link"])
-    ax.text((B[0]+C[0])/2-0.05, (B[1]+C[1])/2+0.28, "BC = 0.500 m", fontsize=10, color=COLORS["link"])
-
-    draw_arrow(ax, B + np.array([0.02, 0.02]), B + np.array([-0.88, 0.88]), COLORS["known"], r"$v_B$")
-    draw_arrow(ax, C + np.array([0.0, 0.30]), C + np.array([-1.15, 0.30]), COLORS["known"], r"$v_C$")
-
-    ax.plot([C[0], C[0]], [C[1]-2.8, C[1]+1.2], color=COLORS["construct"], lw=1.9, ls='--')
-    xline = np.array([B[0]-2.0, B[0]+1.6])
-    yline = B[1] + 1 * (xline - B[0])
-    ax.plot(xline, yline, color=COLORS["construct"], lw=1.9, ls='--')
-    IC = np.array([C[0], B[1] + (C[0]-B[0])])
-
-    ax.plot(*IC, 'o', color='black', ms=6)
-    ax.text(IC[0]+0.10, IC[1]+0.02, "IC", fontsize=11.5, weight='bold', color=COLORS["construct"])
-    ax.text(C[0]+0.12, IC[1]-0.25, "line $\\perp$ to slider velocity", fontsize=8.6, color=COLORS["construct"])
-    ax.text(B[0]-1.1, B[1]+1.15, "line $\\perp$ to $v_B$", fontsize=8.6, color=COLORS["construct"])
-
-    ax.plot([IC[0], B[0]], [IC[1], B[1]], color=COLORS["guide"], lw=1.9)
-    ax.plot([IC[0], C[0]], [IC[1], C[1]], color=COLORS["guide"], lw=1.9)
-    ax.text((IC[0]+B[0])/2-0.28, (IC[1]+B[1])/2+0.10, r"$r_{B/IC}$", fontsize=9.5, color=COLORS["guide"])
-    ax.text(IC[0]+0.10, (IC[1]+C[1])/2, r"$r_{C/IC}$", fontsize=9.5, color=COLORS["guide"])
-
-    finish_axis(ax, (-0.1, 6.2), (-1.35, 4.2))
-    return fig
+def _belt_geometry(ax, crossed=False):
+    A = np.array([1.75, 2.05])
+    B = np.array([6.15, 2.05])
+    rA = 0.92
+    rB = 0.58
+    ax.add_patch(Circle(A, rA, fill=False, ec=COLORS["link"], lw=2.5, zorder=2))
+    ax.add_patch(Circle(B, rB, fill=False, ec=COLORS["link"], lw=2.5, zorder=2))
+    for start, end in _belt_tangent_segments(A, rA, B, rB, crossed):
+        ax.plot([start[0], end[0]], [start[1], end[1]], color=COLORS["guide"], lw=2.5, zorder=1)
+    draw_pin(ax, A, "A", (-0.10, -0.08))
+    draw_pin(ax, B, "B", (-0.10, -0.08))
+    ax.plot([A[0], A[0] + rA], [A[1], A[1]], color=COLORS["construct"], lw=1.3)
+    ax.plot([B[0], B[0] + rB], [B[1], B[1]], color=COLORS["construct"], lw=1.3)
+    ax.text(A[0] + rA / 2.0, A[1] + 0.12, "0.200 m", fontsize=9.2,
+            color=COLORS["link"], ha="center")
+    ax.text(B[0] + 0.08, B[1] - 0.34, "0.125 m", fontsize=9.2,
+            color=COLORS["link"], ha="center")
+    ax.text(3.58, 3.35, "crossed belt (no slip)" if crossed else "open belt (no slip)",
+            fontsize=9.7, color=COLORS["construct"], ha="center")
+    return A, rA, B, rB
 
 
-def draw_belt_velocity(accel=False):
-    fig, ax = plt.subplots(figsize=(8.8, 4.5))
-    A = np.array([2.0, 2.2]); rA = 0.82
-    B = np.array([6.2, 2.2]); rB = 0.52
-
-    ax.add_patch(Circle(A, rA, fill=False, ec=COLORS["link"], lw=2.4))
-    ax.add_patch(Circle(B, rB, fill=False, ec=COLORS["link"], lw=2.4))
-    ax.text(A[0]-0.10, A[1]-0.08, "A", fontsize=12, weight='bold')
-    ax.text(B[0]-0.10, B[1]-0.08, "B", fontsize=12, weight='bold')
-    ax.text(A[0]-0.95, A[1]+1.08, r"$r_A$", fontsize=10, color=COLORS["link"])
-    ax.text(B[0]+0.58, B[1]+0.74, r"$r_B$", fontsize=10, color=COLORS["link"])
-
-    if not accel:
-        # Open belt: same rotation direction
-        topA = A + np.array([0.0, rA]); topB = B + np.array([0.0, rB])
-        botA = A + np.array([0.0, -rA]); botB = B + np.array([0.0, -rB])
-        ax.plot([topA[0], topB[0]], [topA[1], topB[1]], color=COLORS["guide"], lw=2.6)
-        ax.plot([botA[0], botB[0]], [botA[1], botB[1]], color=COLORS["guide"], lw=2.6)
-        ax.text(3.55, 3.35, "open belt", fontsize=10.2, color=COLORS["construct"])
-        ax.text(3.25, 3.05, "same belt speed  v = \u03c9_A r_A = \u03c9_B r_B", fontsize=9.2, color=COLORS["construct"])
-        ax.text(3.55, 0.82, "same rotation direction", fontsize=9.0, color=COLORS["construct"])
-        draw_arrow(ax, np.array([3.25, 3.00]), np.array([4.35, 3.00]), COLORS["relative"], None, lw=2.0)
-        draw_arrow(ax, np.array([4.95, 1.32]), np.array([3.85, 1.32]), COLORS["relative"], None, lw=2.0)
-        angB = np.linspace(math.radians(250), math.radians(40), 90)
-    else:
-        # Crossed belt: opposite rotation direction
-        ax.plot([A[0], B[0]], [A[1]+rA, B[1]-rB], color=COLORS["guide"], lw=2.6)
-        ax.plot([A[0], B[0]], [A[1]-rA, B[1]+rB], color=COLORS["guide"], lw=2.6)
-        ax.text(3.45, 3.40, "crossed belt", fontsize=10.2, color=COLORS["construct"])
-        ax.text(3.00, 3.10, "same belt speed  v = \u03c9_A r_A = \u03c9_B r_B", fontsize=9.2, color=COLORS["construct"])
-        ax.text(3.35, 0.72, "opposite rotation direction", fontsize=9.0, color=COLORS["construct"])
-        draw_arrow(ax, np.array([3.10, 3.00]), np.array([4.30, 2.18]), COLORS["relative"], None, lw=2.0)
-        draw_arrow(ax, np.array([4.95, 1.28]), np.array([3.75, 2.08]), COLORS["relative"], None, lw=2.0)
-        angB = np.linspace(math.radians(130), math.radians(-160), 90)
-
-    # rotation arrows
-    angA = np.linspace(math.radians(250), math.radians(40), 90)
-    ax.plot(A[0]+0.52*np.cos(angA), A[1]+0.52*np.sin(angA), color=COLORS["known"], lw=2)
-    draw_arrow(ax,
-               (A[0]+0.52*math.cos(math.radians(40)), A[1]+0.52*math.sin(math.radians(40))),
-               (A[0]+0.57*math.cos(math.radians(28)), A[1]+0.57*math.sin(math.radians(28))),
-               COLORS["known"], r"$\omega_A$", lw=2)
-    ax.plot(B[0]+0.34*np.cos(angB), B[1]+0.34*np.sin(angB), color=COLORS["resultant"], lw=2)
-    draw_arrow(ax,
-               (B[0]+0.34*math.cos(angB[-2]), B[1]+0.34*math.sin(angB[-2])),
-               (B[0]+0.38*math.cos(angB[-1]), B[1]+0.38*math.sin(angB[-1])),
-               COLORS["resultant"], r"$\omega_B$", lw=2)
-
-    if accel:
-        P = np.array([B[0], B[1]+rB])
-        ax.plot(*P, 'o', color='black', ms=5)
-        ax.text(P[0]+0.12, P[1]+0.06, "P", fontsize=10, weight='bold')
-        draw_arrow(ax, P + np.array([0.10, 0.02]), P + np.array([0.92, 0.02]), COLORS["tangent"], r"$a_t$")
-        draw_arrow(ax, P + np.array([0.0, -0.04]), P + np.array([0.0, -0.84]), COLORS["normal"], r"$a_n$")
-        ax.text(5.25, 0.30, r"normal part = $v^2/r$, so it differs for different radii", fontsize=8.4, color=COLORS["construct"])
-
-    finish_axis(ax, (0.5, 7.4), (0.15, 4.0))
-    return fig
-
-
-def draw_gear_train():
-    fig, ax = plt.subplots(figsize=(8.8, 4.8))
-    centers = {
-        "A": np.array([1.25, 2.35]),
-        "B": np.array([2.85, 2.35]),
-        "C": np.array([2.85, 2.35]),
-        "D": np.array([4.75, 2.35]),
+def _gear_geometry(ax):
+    # Pitch radii are proportional to tooth counts: 20:60 and 30:90.
+    centres = {
+        "A": np.array([1.00, 2.25]),
+        "B": np.array([2.80, 2.25]),
+        "C": np.array([2.80, 2.25]),
+        "D": np.array([5.20, 2.25]),
     }
-    radii = {"A": 0.55, "B": 1.05, "C": 0.65, "D": 1.25}
-
-    for name in ["A", "B", "C", "D"]:
-        centre = centers[name]
+    radii = {"A": 0.45, "B": 1.35, "C": 0.60, "D": 1.80}
+    for name in ("A", "B", "D", "C"):
+        centre = centres[name]
         radius = radii[name]
-        ax.add_patch(Circle(centre, radius, fill=False, ec=COLORS["link"], lw=2.4))
+        ax.add_patch(Circle(centre, radius, fill=False, ec=COLORS["link"], lw=2.3, zorder=2))
+    ax.plot(*centres["B"], "o", color="#111827", ms=6, zorder=6)
+    ax.plot(*centres["A"], "o", color="#111827", ms=5, zorder=6)
+    ax.plot(*centres["D"], "o", color="#111827", ms=5, zorder=6)
+    ax.text(centres["A"][0] - 0.10, centres["A"][1] - 0.08, "A", fontsize=11, weight="bold")
+    ax.text(centres["B"][0] - 0.34, centres["B"][1] + 0.84, "B", fontsize=11, weight="bold")
+    ax.text(centres["C"][0] + 0.20, centres["C"][1] - 0.42, "C", fontsize=11, weight="bold")
+    ax.text(centres["D"][0] - 0.10, centres["D"][1] - 0.08, "D", fontsize=11, weight="bold")
+    ax.plot([1.45, 1.45], [2.15, 2.35], color=COLORS["tangent"], lw=3.0, zorder=7)
+    ax.plot([3.40, 3.40], [2.15, 2.35], color=COLORS["tangent"], lw=3.0, zorder=7)
+    ax.text(0.66, 1.62, "20 teeth", fontsize=9.2, color=COLORS["link"])
+    ax.text(2.30, 3.72, "60 teeth", fontsize=9.2, color=COLORS["link"])
+    ax.text(2.42, 1.50, "30 teeth", fontsize=9.2, color=COLORS["link"])
+    ax.text(5.52, 0.58, "90 teeth", fontsize=9.2, color=COLORS["link"])
+    ax.text(2.80, 2.05, "same shaft", fontsize=8.5, color=COLORS["construct"], ha="center")
+    ax.text(1.45, 4.02, "external mesh", fontsize=8.7, color=COLORS["construct"], ha="center")
+    ax.text(3.40, 4.02, "external mesh", fontsize=8.7, color=COLORS["construct"], ha="center")
+    return centres, radii
 
-    # B and C share one shaft: same centre, same angular velocity.
-    ax.plot(*centers["B"], "o", color="black", ms=6)
-    ax.text(2.52, 2.90, "B", fontsize=12, weight="bold")
-    ax.text(3.05, 1.92, "C", fontsize=12, weight="bold")
-    ax.text(2.48, 2.28, "same shaft", fontsize=8.8, color=COLORS["construct"], ha="center")
-    ax.plot(*centers["A"], "o", color="black", ms=5)
-    ax.plot(*centers["D"], "o", color="black", ms=5)
-    ax.text(1.15, 2.27, "A", fontsize=12, weight="bold")
-    ax.text(4.65, 2.27, "D", fontsize=12, weight="bold")
 
-    # Pitch circles are tangent at both external meshes.
-    ax.plot([1.80, 1.80], [2.27, 2.43], color=COLORS["tangent"], lw=3)
-    ax.plot([3.50, 3.50], [2.27, 2.43], color=COLORS["tangent"], lw=3)
-    ax.text(1.64, 3.63, "A meshes with B", fontsize=9.2, color=COLORS["construct"])
-    ax.text(3.55, 3.63, "C meshes with D", fontsize=9.2, color=COLORS["construct"])
-
-    draw_arrow(ax, centers["A"] + np.array([0.0, 0.72]), centers["A"] + np.array([0.42, 0.20]),
-               COLORS["known"], r"$\omega_A$", lw=2)
-    draw_arrow(ax, centers["D"] + np.array([0.0, 1.38]), centers["D"] + np.array([0.44, 0.80]),
-               COLORS["resultant"], r"$\omega_D$", lw=2)
-
-    ax.text(0.82, 1.53, "20 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(2.45, 3.48, "60 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(2.45, 1.50, "30 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(4.43, 0.93, "90 teeth", fontsize=9.3, color=COLORS["link"])
-    ax.text(0.72, 0.52, "External meshes reverse direction; B and C share the same \u03c9.",
-            fontsize=9.0, color=COLORS["construct"])
-
-    finish_axis(ax, (0.25, 6.25), (0.25, 4.05))
+def draw_fixed_velocity(solution=False):
+    fig, ax = plt.subplots(figsize=(7.2, 4.0))
+    O = np.array([0.0, 0.0])
+    theta = math.radians(50.0)
+    P = np.array([math.cos(theta), math.sin(theta)])
+    ax.add_patch(Circle(O, 1.0, fill=False, ec=COLORS["link"], lw=2.4))
+    draw_pin(ax, O, "O", (-0.15, -0.23), fixed=True)
+    draw_pin(ax, P, "P", (0.09, 0.03))
+    ax.plot([O[0], P[0]], [O[1], P[1]], color=COLORS["guide"], lw=2.0)
+    ax.text(0.31, 0.45, "r = 0.30 m", fontsize=9.6, color=COLORS["link"], rotation=50, ha="center")
+    draw_rotation_arrow(ax, O, 0.43, +1, COLORS["known"], r"$\omega=6\ \mathrm{rad/s}$", start_deg=-65, sweep_deg=210)
+    if solution:
+        tangent = np.array([-math.sin(theta), math.cos(theta)])
+        draw_arrow(ax, P, P + 0.78 * tangent, COLORS["resultant"], r"$v_P=1.80\ \mathrm{m/s}$",
+                   label_offset=(0.18, 0.08))
+        ax.text(1.20, 0.48, r"$\mathbf{v}_P\perp OP$", fontsize=9.2, color=COLORS["resultant"])
+    finish_axis(ax, (-1.35, 2.02), (-1.28, 1.55), transparent=solution)
     return fig
+
+
+def draw_fixed_acceleration(solution=False):
+    fig, ax = plt.subplots(figsize=(7.2, 4.0))
+    O = np.array([0.0, 0.0])
+    theta = math.radians(55.0)
+    P = np.array([math.cos(theta), math.sin(theta)])
+    ax.add_patch(Circle(O, 1.0, fill=False, ec=COLORS["link"], lw=2.4))
+    draw_pin(ax, O, "O", (-0.15, -0.23), fixed=True)
+    draw_pin(ax, P, "P", (0.09, 0.04))
+    ax.plot([O[0], P[0]], [O[1], P[1]], color=COLORS["guide"], lw=2.0)
+    ax.text(0.28, 0.48, "r = 0.30 m", fontsize=9.6, color=COLORS["link"], rotation=55, ha="center")
+    draw_rotation_arrow(ax, O, 0.38, +1, COLORS["known"], r"$\omega=6$", start_deg=-75, sweep_deg=190,
+                        label_offset=(-0.22, -0.06))
+    draw_rotation_arrow(ax, O, 0.62, +1, COLORS["tangent"], r"$\alpha=4$", start_deg=115, sweep_deg=145,
+                        label_offset=(-0.65, -0.55))
+    ax.text(-1.22, -1.04, r"$\omega$ in rad/s; $\alpha$ in rad/s$^2$", fontsize=8.8, color=COLORS["construct"])
+    if solution:
+        tangent = np.array([-math.sin(theta), math.cos(theta)])
+        inward = -P / np.linalg.norm(P)
+        draw_arrow(ax, P + 0.03 * tangent, P + 0.74 * tangent, COLORS["tangent"], r"$a_t=1.20$",
+                   label_offset=(0.16, 0.08))
+        draw_arrow(ax, P, P + 0.74 * inward, COLORS["normal"], r"$a_n=10.8$",
+                   label_offset=(-0.02, -0.13))
+
+    finish_axis(ax, (-1.42, 2.02), (-1.28, 1.62), transparent=solution)
+    return fig
+
+
+def draw_slider_velocity(accel=False, solution=False):
+    fig, ax = plt.subplots(figsize=(7.8, 4.2))
+    A, B, theta = _slider_geometry(ax)
+    midpoint = (A + B) / 2.0
+    if accel:
+        draw_arrow(ax, A + np.array([-0.05, -0.33]), A + np.array([0.86, -0.33]),
+                   COLORS["known"], r"$v_A=1.0\ \mathrm{m/s}$", label_offset=(0.0, -0.13))
+        ax.text(A[0] - 0.04, A[1] + 0.25, r"$a_A=0$ (constant speed)", fontsize=9.0,
+                color=COLORS["known"])
+        if solution:
+            perpendicular = np.array([-math.sin(theta), math.cos(theta)])
+            toward_A = (A - B) / np.linalg.norm(A - B)
+            draw_arrow(ax, B + np.array([0.55, 0.18]), B + np.array([0.55, -0.98]),
+                       COLORS["resultant"], r"$a_B=-16.0\ \mathrm{m/s^2}$", label_offset=(0.25, 0.0))
+            draw_arrow(ax, midpoint + np.array([-0.10, 0.10]),
+                       midpoint + np.array([-0.10, 0.10]) - 0.92 * perpendicular,
+                       COLORS["tangent"], r"$a^t_{B/A}$", label_offset=(-0.10, -0.10))
+            draw_arrow(ax, B + np.array([-0.08, -0.04]), B + np.array([-0.08, -0.04]) + 1.00 * toward_A,
+                       COLORS["normal"], r"$a^n_{B/A}$", label_offset=(0.06, -0.14))
+    else:
+        draw_arrow(ax, A + np.array([-0.05, -0.33]), A + np.array([1.02, -0.33]),
+                   COLORS["known"], r"$v_A=2.0\ \mathrm{m/s}$", label_offset=(0.0, -0.13))
+        if solution:
+            draw_arrow(ax, B + np.array([0.55, -0.12]), B + np.array([0.55, 1.02]),
+                       COLORS["resultant"], r"$v_B=3.46\ \mathrm{m/s}$", label_offset=(0.18, 0.02))
+            perpendicular = np.array([-math.sin(theta), math.cos(theta)])
+            relative_start = midpoint + np.array([0.38, -0.48])
+            draw_arrow(ax, relative_start, relative_start + 0.95 * perpendicular,
+                       COLORS["relative"], r"$v_{B/A}$", label_offset=(0.20, -0.02))
+            rotation_centre = midpoint + np.array([-0.62, 0.62])
+            draw_rotation_arrow(ax, rotation_centre, 0.30, +1, COLORS["resultant"], r"$\omega_{AB}=8.0$",
+                                start_deg=-35, sweep_deg=185, label_offset=(0.0, -0.08))
+    finish_axis(ax, (-0.32, 4.08), (-0.02, 2.92), transparent=solution)
+    return fig
+
+
+def draw_linked_velocity(accel=False, solution=False):
+    fig, ax = plt.subplots(figsize=(8.6, 4.8))
+    A, B, C = _linked_geometry(ax)
+    if accel:
+        draw_arrow(ax, C + np.array([0.18, -0.02]), C + np.array([1.08, -0.92]),
+                   COLORS["known"], r"$a_C=3.0\ \mathrm{m/s^2}$", label_offset=(0.20, -0.08))
+        # Angular velocities are given from the preceding velocity step.
+        draw_rotation_arrow(ax, np.array([2.10, 3.10]), 0.34, -1, COLORS["known"], r"$\omega_{AB}=-2.828$",
+                            start_deg=120, sweep_deg=190, label_offset=(-0.42, -0.08), alpha=0.92)
+        draw_rotation_arrow(ax, np.array([3.60, 1.82]), 0.32, +1, COLORS["known"], r"$\omega_{BC}=2.828$",
+                            start_deg=-55, sweep_deg=190, label_offset=(0.65, -0.02), alpha=0.92)
+        if solution:
+            draw_arrow(ax, B + np.array([0.62, 0.08]), B + np.array([0.62, -1.04]),
+                       COLORS["resultant"], r"$a_B$", label_offset=(0.14, 0.0))
+            draw_arrow(ax, np.array([3.02, 2.14]), np.array([2.04, 2.14]),
+                       COLORS["tangent"], r"$a^t_{C/B}$", label_offset=(0.0, 0.13))
+            draw_arrow(ax, np.array([2.58, 1.02]), np.array([2.58, 1.96]),
+                       COLORS["normal"], r"$a^n_{C/B}$", label_offset=(-0.25, 0.0))
+    else:
+        draw_arrow(ax, C + np.array([0.18, -0.02]), C + np.array([1.10, -0.94]),
+                   COLORS["known"], r"$v_C=8.0\ \mathrm{m/s}$", label_offset=(0.20, -0.08))
+        if solution:
+            draw_arrow(ax, B + np.array([0.60, 0.06]), B + np.array([0.60, -1.06]),
+                       COLORS["resultant"], r"$v_B$", label_offset=(0.12, 0.0))
+            draw_arrow(ax, np.array([3.02, 1.75]), np.array([2.02, 1.75]),
+                       COLORS["relative"], r"$v_{C/B}$", label_offset=(0.0, 0.13))
+            draw_rotation_arrow(ax, np.array([2.10, 3.10]), 0.34, -1, COLORS["resultant"], r"$\omega_{AB}=-2.828$",
+                                start_deg=120, sweep_deg=190, label_offset=(-0.42, -0.08))
+            draw_rotation_arrow(ax, np.array([3.60, 1.82]), 0.32, +1, COLORS["resultant"], r"$\omega_{BC}=2.828$",
+                                start_deg=-55, sweep_deg=190, label_offset=(0.65, -0.02))
+    finish_axis(ax, (0.05, 6.15), (-1.20, 3.92), transparent=solution)
+    return fig
+
+
+def draw_ic_velocity(solution=False):
+    fig, ax = plt.subplots(figsize=(8.5, 4.8))
+    A, B, C = _ic_geometry(ax)
+    draw_rotation_arrow(ax, A, 0.42, +1, COLORS["known"], r"$\omega_{AB}=6\ \mathrm{rad/s}$",
+                        start_deg=-75, sweep_deg=175, label_offset=(-0.20, -0.05))
+    if solution:
+        vB_direction = np.array([-1.0, 1.0]) / math.sqrt(2.0)
+        draw_arrow(ax, B, B + 0.95 * vB_direction, COLORS["known"], r"$v_B=1.20$",
+                   label_offset=(-0.25, 0.24))
+        draw_arrow(ax, C + np.array([0.0, 0.34]), C + np.array([-1.18, 0.34]),
+                   COLORS["resultant"], r"$v_C=1.338$", label_offset=(0.0, 0.13))
+        IC = np.array([C[0], B[1] + (C[0] - B[0])])
+        ax.plot([C[0], C[0]], [C[1], IC[1]], color=COLORS["construct"], lw=1.6, ls="--")
+        ax.plot([B[0], IC[0]], [B[1], IC[1]], color=COLORS["construct"], lw=1.6, ls="--")
+        ax.plot(*IC, "o", color=COLORS["relative"], ms=6, zorder=6)
+        ax.text(IC[0] + 0.10, IC[1] + 0.02, "IC", fontsize=10.5, weight="bold", color=COLORS["relative"])
+        ax.text(C[0] + 0.12, (C[1] + IC[1]) / 2.0, r"$r_{C/IC}$", fontsize=9.1, color=COLORS["construct"])
+        middle = (B + IC) / 2.0
+        ax.text(middle[0] - 0.23, middle[1] + 0.10, r"$r_{B/IC}$", fontsize=9.1,
+                color=COLORS["construct"], rotation=45)
+        draw_rotation_arrow(ax, IC, 0.40, -1, COLORS["resultant"], r"$\omega_{BC}=1.960\ \mathrm{CW}$",
+                            start_deg=110, sweep_deg=185, label_offset=(-0.45, -0.10))
+    finish_axis(ax, (-0.15, 6.10), (-1.02, 4.20), transparent=solution)
+    return fig
+
+
+def draw_belt_velocity(accel=False, solution=False):
+    fig, ax = plt.subplots(figsize=(8.8, 4.6))
+    A, rA, B, rB = _belt_geometry(ax, crossed=accel)
+    if accel:
+        draw_rotation_arrow(ax, A, 0.58, +1, COLORS["known"], r"$\alpha_A=3\ \mathrm{rad/s^2}$",
+                            start_deg=-55, sweep_deg=200, label_offset=(-0.20, 0.02))
+        P = B + np.array([0.0, rB])
+        draw_pin(ax, P, "P", (0.11, 0.05))
+        ax.text(0.55, 0.37, r"$\omega_A(0)=0,\quad t=3\ \mathrm{s}$", fontsize=9.1, color=COLORS["known"])
+        if solution:
+            draw_rotation_arrow(ax, B, 0.38, -1, COLORS["resultant"],
+                                r"$\omega_B=14.4,\ \alpha_B=4.8$", start_deg=125, sweep_deg=200,
+                                label_offset=(0.05, -0.10))
+            for start, end in _belt_tangent_segments(A, rA, B, rB, True):
+                midpoint = (start + end) / 2.0
+                tangent = (end - start) / np.linalg.norm(end - start)
+                draw_arrow(ax, midpoint - 0.45 * tangent, midpoint + 0.45 * tangent,
+                           COLORS["relative"], None, lw=1.9, alpha=0.88)
+    else:
+        draw_rotation_arrow(ax, A, 0.58, +1, COLORS["known"], r"$\omega_A=12\ \mathrm{rad/s}$",
+                            start_deg=-55, sweep_deg=200, label_offset=(-0.18, 0.02))
+        if solution:
+            draw_rotation_arrow(ax, B, 0.38, +1, COLORS["resultant"], r"$\omega_B=19.2\ \mathrm{rad/s}$",
+                                start_deg=-55, sweep_deg=200, label_offset=(0.10, -0.08))
+            for start, end in _belt_tangent_segments(A, rA, B, rB, False):
+                midpoint = (start + end) / 2.0
+                tangent = (end - start) / np.linalg.norm(end - start)
+                draw_arrow(ax, midpoint - 0.48 * tangent, midpoint + 0.48 * tangent,
+                           COLORS["relative"], r"$v_{belt}=2.40\ \mathrm{m/s}$" if midpoint[1] > A[1] else None,
+                           lw=1.9, label_offset=(0.0, 0.13), alpha=0.88)
+    finish_axis(ax, (0.35, 7.35), (0.15, 3.88), transparent=solution)
+    return fig
+
+
+def draw_gear_train(solution=False):
+    fig, ax = plt.subplots(figsize=(9.0, 5.0))
+    centres, radii = _gear_geometry(ax)
+    draw_rotation_arrow(ax, centres["A"], 0.29, -1, COLORS["known"], r"$\omega_A=18\ \mathrm{rad/s\ CW}$",
+                        start_deg=115, sweep_deg=190, label_offset=(-0.38, -0.08))
+    if solution:
+        draw_rotation_arrow(ax, centres["B"], 0.94, +1, COLORS["relative"], r"$\omega_B=\omega_C=6\ \mathrm{rad/s}$",
+                            start_deg=-55, sweep_deg=175, label_offset=(0.28, 0.05), alpha=0.90)
+        draw_rotation_arrow(ax, centres["D"], 1.32, -1, COLORS["resultant"], r"$\omega_D=2.0\ \mathrm{rad/s\ CW}$",
+                            start_deg=115, sweep_deg=180, label_offset=(0.45, -0.02), alpha=0.92)
+        ax.text(0.60, 0.12, "Each external mesh reverses direction; the common B-C shaft does not.",
+                fontsize=8.9, color=COLORS["construct"])
+    finish_axis(ax, (-0.62, 7.32), (0.02, 4.35), transparent=solution)
+    return fig
+
+
+def draw_vector_chain(vectors, labels, colors, title, xlim, ylim):
+    """Head-to-tail vector diagram kept separate from the mechanism drawing."""
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    origin = np.array([0.0, 0.0])
+    cursor = origin.copy()
+    for vector, label, color in zip(vectors, labels, colors):
+        vector = np.asarray(vector, dtype=float)
+        next_point = cursor + vector
+        draw_arrow(ax, cursor, next_point, color, label, lw=2.4,
+                   label_offset=(0.0, 0.14), mutation=15)
+        cursor = next_point
+    draw_arrow(ax, origin, cursor, COLORS["resultant"], r"$\mathrm{resultant}$", lw=2.0,
+               ls="--", alpha=0.80, label_offset=(0.0, -0.17))
+    ax.axhline(0.0, color=COLORS["guide"], lw=1.0, ls=":", alpha=0.75)
+    ax.axvline(0.0, color=COLORS["guide"], lw=1.0, ls=":", alpha=0.75)
+    ax.text(xlim[0] + 0.06 * (xlim[1] - xlim[0]), ylim[1] - 0.10 * (ylim[1] - ylim[0]),
+            title, fontsize=10.2, color=COLORS["construct"], weight="bold")
+    finish_axis(ax, xlim, ylim, transparent=True)
+    return fig
+
+
+def draw_local_acceleration_components_A3():
+    """Illustrative local n-t diagram; arrow lengths are not to scale."""
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    P = np.array([0.0, 0.0])
+    ax.plot(*P, "o", color="#111827", ms=7, zorder=6)
+    ax.text(P[0] - 0.18, P[1] + 0.18, "P", fontsize=11, weight="bold")
+    draw_arrow(ax, P, P + np.array([2.35, 0.0]), COLORS["tangent"],
+               r"$a_t=0.60\ \mathrm{m/s^2}$", label_offset=(0.0, 0.18), mutation=15)
+    draw_arrow(ax, P, P + np.array([0.0, -2.35]), COLORS["normal"],
+               r"$a_n=25.92\ \mathrm{m/s^2}$", label_offset=(-0.42, 0.0), mutation=15)
+    draw_arrow(ax, P, P + np.array([0.48, -2.08]), COLORS["resultant"],
+               r"$\mathbf{a}_P$", label_offset=(0.28, 0.0), ls="--", alpha=0.85)
+    ax.text(0.36, -2.78, "Arrow lengths are schematic; values are labelled.",
+            fontsize=8.9, color=COLORS["construct"], ha="center")
+    ax.text(-0.42, 0.72, "Point P on pulley B: local tangential-normal directions",
+            fontsize=10.0, color=COLORS["construct"], weight="bold")
+    finish_axis(ax, (-0.78, 3.20), (-3.05, 1.15), transparent=True)
+    return fig
+
+
+def draw_component_diagram(problem_id):
+    """Return a separate pedagogical vector/component diagram where it adds value."""
+    if problem_id == "V2":
+        return draw_vector_chain(
+            [(2.0, 0.0), (-2.0, 3.464)],
+            [r"$\mathbf{v}_A$", r"$\mathbf{v}_{B/A}$"],
+            [COLORS["known"], COLORS["relative"]],
+            "Velocity polygon: v_B = v_A + v_B/A", (-0.55, 2.65), (-0.55, 4.15),
+        )
+    if problem_id == "V3":
+        return draw_vector_chain(
+            [(0.0, -5.657), (5.657, 0.0)],
+            [r"$\mathbf{v}_B$", r"$\mathbf{v}_{C/B}$"],
+            [COLORS["known"], COLORS["relative"]],
+            "Velocity polygon: v_C = v_B + v_C/B", (-0.95, 6.55), (-6.55, 0.90),
+        )
+    if problem_id == "V4":
+        return draw_vector_chain(
+            [(-0.8485, 0.8485), (-0.4899, -0.8485)],
+            [r"$\mathbf{v}_B$", r"$\mathbf{v}_{C/B}$"],
+            [COLORS["known"], COLORS["relative"]],
+            "Component check: the slider result is horizontal", (-1.72, 0.38), (-0.40, 1.30),
+        )
+    if problem_id == "A1":
+        return draw_vector_chain(
+            [(0.0, 1.20), (-10.80, 0.0)],
+            [r"$\mathbf{a}_t$", r"$\mathbf{a}_n$"],
+            [COLORS["tangent"], COLORS["normal"]],
+            "Perpendicular acceleration components", (-12.25, 0.85), (-0.75, 2.15),
+        )
+    if problem_id == "A2":
+        return draw_vector_chain(
+            [(6.928, -12.0), (-6.928, -4.0)],
+            [r"$\mathbf{a}^t_{B/A}$", r"$\mathbf{a}^n_{B/A}$"],
+            [COLORS["tangent"], COLORS["normal"]],
+            "Acceleration polygon: horizontal parts cancel", (-1.25, 8.15), (-17.75, 1.45),
+        )
+    if problem_id == "A3":
+        return draw_local_acceleration_components_A3()
+    if problem_id == "A4":
+        return draw_vector_chain(
+            [(-16.0, -18.121), (18.121, 0.0), (0.0, 16.0)],
+            [r"$\mathbf{a}_B$", r"$\mathbf{a}^t_{C/B}$", r"$\mathbf{a}^n_{C/B}$"],
+            [COLORS["known"], COLORS["tangent"], COLORS["normal"]],
+            "Acceleration polygon: a_C = a_B + a_t + a_n", (-18.5, 4.45), (-20.4, 2.65),
+        )
+    return None
 
 
 def render_problem_figure(problem):
-    if problem["diagram"] == "fixed_velocity":
-        fig = draw_fixed_velocity()
-    elif problem["diagram"] == "fixed_acceleration":
-        fig = draw_fixed_acceleration()
-    elif problem["diagram"] == "slider_velocity":
-        fig = draw_slider_velocity(accel=False)
-    elif problem["diagram"] == "slider_acceleration":
-        fig = draw_slider_velocity(accel=True)
-    elif problem["diagram"] == "linked_velocity":
-        fig = draw_linked_velocity(accel=False)
-    elif problem["diagram"] == "linked_acceleration":
-        fig = draw_linked_velocity(accel=True)
-    elif problem["diagram"] == "ic_velocity":
-        fig = draw_ic_velocity()
-    elif problem["diagram"] == "belt_velocity":
-        fig = draw_belt_velocity(accel=False)
-    elif problem["diagram"] == "belt_acceleration":
-        fig = draw_belt_velocity(accel=True)
-    elif problem["diagram"] == "gear_train":
-        fig = draw_gear_train()
+    """Render only geometry, dimensions, constraints, angles, and given motion."""
+    diagram = problem["diagram"]
+    if diagram == "fixed_velocity":
+        fig = draw_fixed_velocity(solution=False)
+    elif diagram == "fixed_acceleration":
+        fig = draw_fixed_acceleration(solution=False)
+    elif diagram == "slider_velocity":
+        fig = draw_slider_velocity(accel=False, solution=False)
+    elif diagram == "slider_acceleration":
+        fig = draw_slider_velocity(accel=True, solution=False)
+    elif diagram == "linked_velocity":
+        fig = draw_linked_velocity(accel=False, solution=False)
+    elif diagram == "linked_acceleration":
+        fig = draw_linked_velocity(accel=True, solution=False)
+    elif diagram == "ic_velocity":
+        fig = draw_ic_velocity(solution=False)
+    elif diagram == "belt_velocity":
+        fig = draw_belt_velocity(accel=False, solution=False)
+    elif diagram == "belt_acceleration":
+        fig = draw_belt_velocity(accel=True, solution=False)
+    elif diagram == "gear_train":
+        fig = draw_gear_train(solution=False)
     else:
         fig, _ = plt.subplots()
     st.pyplot(fig, clear_figure=True, width="stretch")
 
+
+def _solution_mechanism_figure(problem):
+    diagram = problem["diagram"]
+    if diagram == "fixed_velocity":
+        return draw_fixed_velocity(solution=True)
+    if diagram == "fixed_acceleration":
+        return draw_fixed_acceleration(solution=True)
+    if diagram == "slider_velocity":
+        return draw_slider_velocity(accel=False, solution=True)
+    if diagram == "slider_acceleration":
+        return draw_slider_velocity(accel=True, solution=True)
+    if diagram == "linked_velocity":
+        return draw_linked_velocity(accel=False, solution=True)
+    if diagram == "linked_acceleration":
+        return draw_linked_velocity(accel=True, solution=True)
+    if diagram == "ic_velocity":
+        return draw_ic_velocity(solution=True)
+    if diagram == "belt_velocity":
+        return draw_belt_velocity(accel=False, solution=True)
+    if diagram == "belt_acceleration":
+        return draw_belt_velocity(accel=True, solution=True)
+    if diagram == "gear_train":
+        return draw_gear_train(solution=True)
+    fig, _ = plt.subplots()
+    return fig
+
+
+def render_solution_diagrams(problem):
+    """Render solution-only figures with transparent canvases and no overlays."""
+    st.markdown("### Solution diagrams")
+    st.caption(
+        "These diagrams intentionally appear only in the Solution tab. "
+        "Each figure uses a transparent canvas and a separate plotting area so vectors do not hide the mechanism."
+    )
+    component = draw_component_diagram(problem["id"])
+    if component is None:
+        st.pyplot(_solution_mechanism_figure(problem), clear_figure=True, width="stretch")
+    else:
+        left, right = st.columns(2, gap="large")
+        with left:
+            st.markdown("**Motion and constraint diagram**")
+            st.pyplot(_solution_mechanism_figure(problem), clear_figure=True, width="stretch")
+        with right:
+            st.markdown("**Component / construction diagram**")
+            st.pyplot(component, clear_figure=True, width="stretch")
+    st.markdown(vector_legend_html(problem["topic"]), unsafe_allow_html=True)
 
 def render_learn_tab(topic):
     st.markdown("## Main points and formulas")
@@ -1552,13 +1811,14 @@ def render_direction_tab(problem, mode):
         """
         <div class="info">
         Choose the correct direction rules before doing the calculations.
-        The app uses colour to distinguish the different vectors in the mechanism drawing.
+        This question figure shows only geometry, dimensions, constraints, angles,
+        and motion data given in the problem. Solution vectors are deliberately hidden.
         </div>
         """,
         unsafe_allow_html=True,
     )
     render_problem_figure(problem)
-    st.markdown(vector_legend_html(problem["topic"]), unsafe_allow_html=True)
+    st.caption("Bare-minimum question diagram - no inferred or answer vectors are shown.")
     st.markdown("---")
 
     for i, item in enumerate(problem["direction_questions"]):
@@ -1587,19 +1847,26 @@ def render_equation_tab(problem, mode):
         """,
         unsafe_allow_html=True,
     )
-    for i, item in enumerate(problem["equation_questions"]):
-        st.markdown(f"**{i+1}. {item['q']}**")
-        response = st.radio(
-            f"Equation question {i+1}",
-            item["options"],
-            key=f"{problem['id']}_eq_{i}",
-            label_visibility="collapsed",
-        )
-        if mode == "Practice":
-            if response == item["correct"]:
-                st.markdown(f"<div class='good'>Correct. {item['why']}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='bad'>Try again. {item['why']}</div>", unsafe_allow_html=True)
+    reference_col, question_col = st.columns([0.82, 1.18], gap="large")
+    with reference_col:
+        st.markdown("### Given geometry")
+        render_problem_figure(problem)
+        st.caption("Only the givens needed to select the equation are shown.")
+    with question_col:
+        st.markdown("### Equation choice")
+        for i, item in enumerate(problem["equation_questions"]):
+            st.markdown(f"**{i+1}. {item['q']}**")
+            response = st.radio(
+                f"Equation question {i+1}",
+                item["options"],
+                key=f"{problem['id']}_eq_{i}",
+                label_visibility="collapsed",
+            )
+            if mode == "Practice":
+                if response == item["correct"]:
+                    st.markdown(f"<div class='good'>Correct. {item['why']}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div class='bad'>Try again. {item['why']}</div>", unsafe_allow_html=True)
 
 
 def render_problem_tab(problem):
@@ -1613,9 +1880,12 @@ def render_problem_tab(problem):
             unsafe_allow_html=True,
         )
     with c2:
-        st.markdown("### Current mechanism diagram")
+        st.markdown("### Bare-minimum question diagram")
         render_problem_figure(problem)
-        st.markdown(vector_legend_html(problem["topic"]), unsafe_allow_html=True)
+        st.caption(
+            "Shows only the geometry, dimensions, constraints, angles, and given motion. "
+            "All inferred velocity, acceleration, relative-motion, displacement, and component vectors are reserved for the Solution tab."
+        )
 
 
 def render_solve_tab(problem, mode):
@@ -1687,6 +1957,8 @@ def render_solution_tab(problem, mode):
         st.markdown("Classify the motion, mark the velocity directions, choose the compatibility relation, and solve the components.")
     else:
         st.markdown("Complete velocity analysis first, then add the tangential and normal acceleration components.")
+
+    render_solution_diagrams(problem)
 
     if problem.get("vector_lines"):
         st.markdown(r"### Vector extraction in $\mathbf{i}$ and $\mathbf{j}$")
