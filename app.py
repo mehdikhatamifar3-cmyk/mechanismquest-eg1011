@@ -80,7 +80,7 @@ def load_logo_b64():
 
 
 LOGO_B64 = load_logo_b64()
-APP_BUILD_ID = "encoding-proof-diagrams-random-ab-bc-2026-11-21-r3"
+APP_BUILD_ID = "encoding-proof-diagrams-random-ab-bc-2026-11-21-r4"
 
 COLORS = {
     "known": "#2563eb",      # blue
@@ -949,9 +949,31 @@ RANDOM_OMEGA_AB = 4.00
 RANDOM_ALPHA_AB = 5.00
 
 
+def _vec2(value, name="vector"):
+    """Return one finite planar vector with a stable, explicit (2,) shape."""
+    vector = np.asarray(value, dtype=float)
+    if vector.shape != (2,):
+        raise ValueError(name + " must have shape (2,), received " + repr(vector.shape) + ".")
+    if not np.all(np.isfinite(vector)):
+        raise ValueError(name + " must contain only finite values.")
+    return vector
+
+
+def _cross2d(left, right):
+    """Return the scalar z-component of the cross product of two 2-D vectors.
+
+    NumPy's np.cross previously accepted two length-2 arrays and returned a
+    zero-dimensional scalar.  That compatibility path is deprecated/removed
+    in newer NumPy releases, so compute the planar determinant explicitly.
+    """
+    left = _vec2(left, "left planar vector")
+    right = _vec2(right, "right planar vector")
+    return float(left[0] * right[1] - left[1] * right[0])
+
+
 def _unit_from_degrees(angle_deg):
     angle = math.radians(float(angle_deg))
-    return np.array([math.cos(angle), math.sin(angle)], dtype=float)
+    return _vec2([math.cos(angle), math.sin(angle)], "unit direction")
 
 
 def _random_combination_valid(theta_ab_deg, theta_bc_down_deg, guide_down_deg):
@@ -1243,19 +1265,26 @@ def validate_randomized_activity():
                     continue
                 data = solve_random_two_link(theta_ab, theta_bc, guide_angle)
                 valid_count += 1
-                arrays = [
-                    data["v_b"], data["v_c"], data["v_cb"], data["a_b"],
-                    data["a_cb_t"], data["a_cb_n"], data["a_c"],
-                ]
-                if not all(np.all(np.isfinite(item)) for item in arrays):
-                    raise RuntimeError("Non-finite randomized two-link result.")
-                if np.linalg.norm(data["v_b"] + data["v_cb"] - data["v_c"]) > 1.0e-9:
+                vector_names = (
+                    "A", "B", "C", "e_ab", "n_ab", "e_bc", "n_bc", "guide",
+                    "r_ba", "r_cb", "v_b", "v_c", "v_cb", "a_b_t", "a_b_n",
+                    "a_b", "a_cb_t", "a_cb_n", "a_c",
+                )
+                vectors = {name: _vec2(data[name], name) for name in vector_names}
+                scalar_names = (
+                    "theta_ab", "theta_bc_down", "theta_bc_abs", "guide_down",
+                    "guide_abs", "v_c_signed", "a_c_signed", "omega_bc",
+                    "alpha_bc", "denominator",
+                )
+                if not all(math.isfinite(float(data[name])) for name in scalar_names):
+                    raise RuntimeError("Non-finite randomized two-link scalar result.")
+                if float(np.linalg.norm(vectors["v_b"] + vectors["v_cb"] - vectors["v_c"])) > 1.0e-9:
                     raise RuntimeError("Randomized relative-velocity closure failed.")
-                if np.linalg.norm(data["a_b"] + data["a_cb_t"] + data["a_cb_n"] - data["a_c"]) > 1.0e-8:
+                if float(np.linalg.norm(vectors["a_b"] + vectors["a_cb_t"] + vectors["a_cb_n"] - vectors["a_c"])) > 1.0e-8:
                     raise RuntimeError("Randomized relative-acceleration closure failed.")
-                if abs(np.cross(data["guide"], data["v_c"])) > 1.0e-9:
+                if abs(_cross2d(vectors["guide"], vectors["v_c"])) > 1.0e-9:
                     raise RuntimeError("Randomized slider velocity violates its guide.")
-                if abs(np.cross(data["guide"], data["a_c"])) > 1.0e-8:
+                if abs(_cross2d(vectors["guide"], vectors["a_c"])) > 1.0e-8:
                     raise RuntimeError("Randomized slider acceleration violates its guide.")
     if valid_count < 100:
         raise RuntimeError("Too few valid randomized two-link geometries.")
