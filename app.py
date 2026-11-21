@@ -80,7 +80,7 @@ def load_logo_b64():
 
 
 LOGO_B64 = load_logo_b64()
-APP_BUILD_ID = "science-and-diagram-review-2026-11-21-r6"
+APP_BUILD_ID = "science-and-diagram-review-2026-11-21-r7"
 
 # Mechanics references checked during the scientific review:
 # https://mechref.engr.illinois.edu/dyn/rkg.html
@@ -743,8 +743,9 @@ PROBLEMS = [
             r"|\omega_{BC}|=\frac{1.20}{0.61237}=1.95959\ \mathrm{rad/s}\quad\text{(clockwise)}",
             r"|v_C|=|\omega_{BC}|r_{C/IC}=1.33843\ \mathrm{m/s}\quad\text{(leftward)}",
             r"\mathbf{v}_C=\mathbf{v}_B+\omega_{BC}\mathbf{k}\times\mathbf{r}_{C/B}",
-            r"Using components gives \omega_{BC}=-1.960\ \text{rad/s (clockwise)}",
-            r"v_C=-1.338\ \text{m/s (to the left)}",
+            r"u\,\mathbf{i}=(-0.8485\,\mathbf{i}+0.8485\,\mathbf{j})+(0.250\omega_{BC}\,\mathbf{i}+0.433\omega_{BC}\,\mathbf{j})",
+            r"j:\ 0=0.8485+0.433\omega_{BC}\Rightarrow\omega_{BC}=-1.960\ \text{rad/s (clockwise)}",
+            r"i:\ v_C=-0.8485+0.250(-1.960)=-1.338\ \text{m/s (to the left)}",
         ],
         "teaching_point": "The instantaneous centre is mainly a velocity method. It helps you get directions and speed ratios quickly.",
     },
@@ -993,12 +994,13 @@ PROBLEMS = [
             r"-\omega_{AB}^2\mathbf{r}_{B/A}=-16(0.433\mathbf{i}+0.250\mathbf{j})=(-6.928\mathbf{i}-4.000\mathbf{j})",
         ],
         "solution_lines": [
-            r"\text{From the velocity step: }\omega_{AB}=4.00\ \text{rad/s}",
             r"\mathbf{r}_{B/A}=(0.433\,\mathbf{i}+0.250\,\mathbf{j})\ \text{m}",
-            r"\mathbf{a}_B=\mathbf 0+\alpha_{AB}\mathbf{k}\times\mathbf{r}_{B/A}-\omega_{AB}^2\mathbf{r}_{B/A}",
+            r"\text{Velocity step: }\mathbf{v}_B=\mathbf{v}_A+\omega_{AB}\mathbf{k}\times\mathbf{r}_{B/A}=(1.0-0.250\omega_{AB})\mathbf{i}+(0.433\omega_{AB})\mathbf{j}",
+            r"v_{Bx}=0\Rightarrow 1.0-0.250\omega_{AB}=0\Rightarrow\omega_{AB}=4.00\ \text{rad/s}",
+            r"\text{Acceleration step: }\mathbf{a}_B=\mathbf 0+\alpha_{AB}\mathbf{k}\times\mathbf{r}_{B/A}-\omega_{AB}^2\mathbf{r}_{B/A}",
             r"\mathbf{a}_B=(-0.25\alpha_{AB}-6.928)\mathbf{i}+(0.433\alpha_{AB}-4.000)\mathbf{j}",
             r"a_{Bx}=0\Rightarrow -0.25\alpha_{AB}-6.928=0 \Rightarrow \alpha_{AB}=-27.713\ \text{rad/s}^2",
-            r"a_{By}=0.433(-27.713)-4=-16.0\ \text{m/s}^2",
+            r"a_{By}=0.433(-27.713)-4.000=-16.0\ \text{m/s}^2\ \text{(downward)}",
         ],
         "teaching_point": "Acceleration analysis is not complete without the normal term. That is the most common omission.",
     },
@@ -1405,10 +1407,12 @@ def make_random_two_link_problem(seed):
     a_c_signed = data["a_c_signed"]
     den = data["denominator"]
 
-    sign_omega = "counterclockwise" if omega_bc >= 0.0 else "clockwise"
-    sign_alpha = "counterclockwise" if alpha_bc >= 0.0 else "clockwise"
-    sign_vc = "along the displayed +s_C arrow" if v_c_signed >= 0.0 else "opposite the displayed +s_C arrow"
-    sign_ac = "along the displayed +s_C arrow" if a_c_signed >= 0.0 else "opposite the displayed +s_C arrow"
+    sign_omega = r"\text{counterclockwise}" if omega_bc >= 0.0 else r"\text{clockwise}"
+    sign_alpha = r"\text{counterclockwise}" if alpha_bc >= 0.0 else r"\text{clockwise}"
+    sign_vc = (r"\text{along the displayed }{+s_C}\text{ arrow}" if v_c_signed >= 0.0
+               else r"\text{opposite the displayed }{+s_C}\text{ arrow}")
+    sign_ac = (r"\text{along the displayed }{+s_C}\text{ arrow}" if a_c_signed >= 0.0
+               else r"\text{opposite the displayed }{+s_C}\text{ arrow}")
 
     groups = [
         (
@@ -1774,7 +1778,7 @@ def finish_axis(ax, xlim, ylim, transparent=False):
     ax.figure.tight_layout(pad=0.25)
 
 
-def _slider_geometry(ax):
+def _slider_geometry(ax, accel=False):
     A = np.array([0.35, 0.55])
     length = 2.55
     theta = math.radians(30.0)
@@ -1794,7 +1798,8 @@ def _slider_geometry(ax):
     midpoint = (A + B) / 2.0
     ax.text(midpoint[0] - 0.03, midpoint[1] + 0.22, "AB = 0.50 m",
             fontsize=9.7, color=COLORS["link"], rotation=30, ha="center")
-    ax.text(B[0] + 0.44, B[1] - 0.02, "vertical guide", fontsize=9.0,
+    guide_label_y = B[1] + 0.78 if accel else B[1] - 0.86
+    ax.text(B[0] + 0.44, guide_label_y, "vertical guide", fontsize=9.0,
             color=COLORS["construct"], rotation=90, va="center")
     return A, B, theta
 
@@ -1819,7 +1824,7 @@ def _linked_geometry(ax):
     draw_pin(ax, A, "A", (-0.14, 0.15), fixed=True)
     draw_pin(ax, B, "B", (0.10, 0.13))
     draw_pin(ax, C, "C", (0.12, -0.05))
-    ax.text((A[0] + B[0]) / 2.0 + 0.52, A[1] + 0.28, "AB = 2 m",
+    ax.text(A[0] + 0.75, A[1] - 0.34, "AB = 2 m",
             fontsize=10.2, color=COLORS["link"], ha="center")
     ax.text(B[0] - 0.34, (B[1] + C[1]) / 2.0, "BC = 2 m",
             fontsize=10.2, color=COLORS["link"], rotation=90, va="center")
@@ -1832,8 +1837,11 @@ def _linked_geometry(ax):
     return A, B, C
 
 
+IC_DRAWING_SCALE = 7.0  # drawing units per metre, shared by the mechanism and the IC marker
+
+
 def _ic_geometry(ax):
-    scale = 6.0
+    scale = IC_DRAWING_SCALE
     A = np.array([0.65, 0.72])
     B = A + (0.200 * scale) * np.array([math.cos(math.radians(45.0)), math.sin(math.radians(45.0))])
     C = B + (0.500 * scale) * np.array([math.cos(math.radians(-30.0)), math.sin(math.radians(-30.0))])
@@ -1846,7 +1854,7 @@ def _ic_geometry(ax):
     ax.plot([C[0] - 0.92, C[0] + 0.72], [C[1] + 0.22, C[1] + 0.22], color=COLORS["guide"], lw=2)
     ax.add_patch(Rectangle((C[0] - 0.23, C[1] - 0.16), 0.46, 0.32,
                            fill=False, ec=COLORS["link"], lw=2))
-    ax.text((A[0] + B[0]) / 2.0 + 0.12, (A[1] + B[1]) / 2.0 - 0.28,
+    ax.text((A[0] + B[0]) / 2.0 - 0.52, (A[1] + B[1]) / 2.0 + 0.24,
             "AB = 0.200 m", fontsize=9.5, color=COLORS["link"], rotation=45, ha="center")
     ax.text((B[0] + C[0]) / 2.0, (B[1] + C[1]) / 2.0 + 0.28,
             "BC = 0.500 m", fontsize=9.5, color=COLORS["link"], rotation=-30, ha="center")
@@ -1854,7 +1862,7 @@ def _ic_geometry(ax):
     draw_angle_arc(ax, A, 0.42, 0.0, 45.0, "45\u00b0", COLORS["construct"], 0.64)
     ax.plot([B[0], B[0] + 0.78], [B[1], B[1]], color=COLORS["construct"], lw=1.1, ls="--")
     draw_angle_arc(ax, B, 0.48, -30.0, 0.0, "30\u00b0", COLORS["construct"], 0.70)
-    ax.text(C[0] - 0.55, C[1] - 0.48, "horizontal guide", fontsize=8.9, color=COLORS["construct"])
+    ax.text(C[0] + 0.05, C[1] - 0.50, "horizontal guide", fontsize=8.9, color=COLORS["construct"])
     return A, B, C
 
 
@@ -1892,13 +1900,13 @@ def _belt_geometry(ax, crossed=False):
     ax.add_patch(Circle(B, rB, fill=False, ec=COLORS["link"], lw=2.5, zorder=2))
     for start, end in _belt_tangent_segments(A, rA, B, rB, crossed):
         ax.plot([start[0], end[0]], [start[1], end[1]], color=COLORS["guide"], lw=2.5, zorder=1)
-    draw_pin(ax, A, "A", (-0.10, -0.08))
-    draw_pin(ax, B, "B", (-0.10, -0.08))
+    draw_pin(ax, A, "A", (-0.32, 0.10))
+    draw_pin(ax, B, "B", (-0.32, 0.10))
     ax.plot([A[0], A[0] + rA], [A[1], A[1]], color=COLORS["construct"], lw=1.3)
     ax.plot([B[0], B[0] + rB], [B[1], B[1]], color=COLORS["construct"], lw=1.3)
-    ax.text(A[0] + rA / 2.0, A[1] + 0.12, "0.200 m", fontsize=9.2,
+    ax.text(A[0], A[1] - rA - 0.30, r"$r_A=0.200\ \mathrm{m}$", fontsize=9.2,
             color=COLORS["link"], ha="center")
-    ax.text(B[0] + 0.08, B[1] - 0.34, "0.125 m", fontsize=9.2,
+    ax.text(B[0], B[1] - rB - 0.30, r"$r_B=0.125\ \mathrm{m}$", fontsize=9.2,
             color=COLORS["link"], ha="center")
     ax.text(3.58, 3.35, "crossed belt (no slip)" if crossed else "open belt (no slip)",
             fontsize=9.7, color=COLORS["construct"], ha="center")
@@ -2031,6 +2039,12 @@ def draw_random_two_link(problem, stage="question"):
     A, B, C = _random_two_link_geometry(ax, problem, transparent=transparent)
     data = problem["kinematics"]
     midpoint = (B + C) / 2.0
+    # Put the C-vector labels on the side of the guide that faces away from A,
+    # so they do not collide with the fixed support or the +s_C datum arrow.
+    guide_normal = np.array([-data["guide"][1], data["guide"][0]])
+    if float(np.dot(guide_normal, C - A)) < 0.0:
+        guide_normal = -guide_normal
+    c_label_offset = (0.36 * float(guide_normal[0]), 0.36 * float(guide_normal[1]))
 
     if stage == "velocity":
         draw_arrow(ax, B + np.array([0.12, 0.05]),
@@ -2040,7 +2054,7 @@ def draw_random_two_link(problem, stage="question"):
         draw_arrow(ax, C + np.array([-0.05, -0.05]),
                    _schematic_vector_end(C + np.array([-0.05, -0.05]), data["v_c"], 0.92),
                    COLORS["resultant"], rf"$|\mathbf{{v}}_C|={abs(data['v_c_signed']):.2f}\ \mathrm{{m/s}}$",
-                   label_offset=(0.10, -0.16))
+                   label_offset=c_label_offset)
         rel_start = midpoint + np.array([-0.55, 0.10])
         draw_arrow(ax, rel_start, _schematic_vector_end(rel_start, data["v_cb"], 0.82),
                    COLORS["relative"], r"$\mathbf{v}_{C/B}$", label_offset=(0.18, 0.10))
@@ -2054,7 +2068,7 @@ def draw_random_two_link(problem, stage="question"):
                    COLORS["known"], r"$\mathbf{a}_B$", label_offset=(-0.18, 0.14))
         draw_arrow(ax, C + np.array([-0.05, -0.04]),
                    _schematic_vector_end(C + np.array([-0.05, -0.04]), data["a_c"], 0.92),
-                   COLORS["resultant"], r"$\mathbf{a}_C$", label_offset=(0.10, -0.16))
+                   COLORS["resultant"], r"$\mathbf{a}_C$", label_offset=c_label_offset)
         t_start = midpoint + np.array([-0.65, 0.30])
         n_start = midpoint + np.array([0.42, -0.28])
         draw_arrow(ax, t_start, _schematic_vector_end(t_start, data["a_cb_t"], 0.70),
@@ -2108,12 +2122,13 @@ def draw_fixed_velocity(solution=False):
     draw_pin(ax, O, "O", (-0.15, -0.23), fixed=True)
     draw_pin(ax, P, "P", (0.09, 0.03))
     ax.plot([O[0], P[0]], [O[1], P[1]], color=COLORS["guide"], lw=2.0)
-    ax.text(0.31, 0.45, "r = 0.30 m", fontsize=9.6, color=COLORS["link"], rotation=50, ha="center")
-    draw_rotation_arrow(ax, O, 0.43, +1, COLORS["known"], r"$\omega=6\ \mathrm{rad/s}$", start_deg=-65, sweep_deg=210)
+    ax.text(0.50, 0.24, "r = 0.30 m", fontsize=9.6, color=COLORS["link"], rotation=50, ha="center")
+    draw_rotation_arrow(ax, O, 0.43, +1, COLORS["known"], r"$\omega=6\ \mathrm{rad/s}$", start_deg=-65, sweep_deg=210,
+                        label_offset=(-0.40, 0.0))
     if solution:
         tangent = np.array([-math.sin(theta), math.cos(theta)])
         draw_arrow(ax, P, P + 0.78 * tangent, COLORS["resultant"], r"$v_P=1.80\ \mathrm{m/s}$",
-                   label_offset=(0.18, 0.08))
+                   label_offset=(0.55, 0.32))
         ax.text(1.20, 0.48, r"$\mathbf{v}_P\perp OP$", fontsize=9.2, color=COLORS["resultant"])
     finish_axis(ax, (-1.35, 2.02), (-1.28, 1.55), transparent=solution)
     return fig
@@ -2128,9 +2143,10 @@ def draw_fixed_acceleration(solution=False):
     draw_pin(ax, O, "O", (-0.15, -0.23), fixed=True)
     draw_pin(ax, P, "P", (0.09, 0.04))
     ax.plot([O[0], P[0]], [O[1], P[1]], color=COLORS["guide"], lw=2.0)
-    ax.text(0.28, 0.48, "r = 0.30 m", fontsize=9.6, color=COLORS["link"], rotation=55, ha="center")
+    if not solution:
+        ax.text(0.50, 0.26, "r = 0.30 m", fontsize=9.6, color=COLORS["link"], rotation=55, ha="center")
     draw_rotation_arrow(ax, O, 0.38, +1, COLORS["known"], r"$\omega=6$", start_deg=-75, sweep_deg=190,
-                        label_offset=(-0.22, -0.06))
+                        label_offset=(-0.62, -0.12))
     draw_rotation_arrow(ax, O, 0.62, +1, COLORS["tangent"], r"$\alpha=4$", start_deg=115, sweep_deg=145,
                         label_offset=(-0.65, -0.55))
     ax.text(-1.22, -1.04, r"$\omega$ in rad/s; $\alpha$ in rad/s$^2$", fontsize=8.8, color=COLORS["construct"])
@@ -2138,11 +2154,11 @@ def draw_fixed_acceleration(solution=False):
         data = solve_guided_problem("A1")
         scale = 0.085  # One common scale for all three acceleration vectors.
         draw_arrow(ax, P, P + scale * data["a_t"], COLORS["tangent"], r"$a_t=1.20$",
-                   label_offset=(0.16, 0.08))
+                   label_offset=(0.34, 0.10))
         draw_arrow(ax, P, P + scale * data["a_n"], COLORS["normal"], r"$a_n=10.8$",
-                   label_offset=(-0.02, -0.13))
+                   label_offset=(0.42, -0.12))
         draw_arrow(ax, P, P + scale * data["a_p"], COLORS["resultant"], r"$\mathbf{a}_P$",
-                   label_offset=(-0.19, 0.13), ls="--")
+                   label_offset=(-0.40, 0.16), ls="--")
 
     finish_axis(ax, (-1.42, 2.02), (-1.28, 1.62), transparent=solution)
     return fig
@@ -2150,13 +2166,12 @@ def draw_fixed_acceleration(solution=False):
 
 def draw_slider_velocity(accel=False, solution=False):
     fig, ax = plt.subplots(figsize=(7.8, 4.2))
-    A, B, theta = _slider_geometry(ax)
+    A, B, theta = _slider_geometry(ax, accel=accel)
     midpoint = (A + B) / 2.0
     if accel:
         draw_arrow(ax, A + np.array([-0.05, -0.33]), A + np.array([0.86, -0.33]),
-                   COLORS["known"], r"$v_A=1.0\ \mathrm{m/s}$", label_offset=(0.0, -0.13))
-        ax.text(A[0] - 0.04, A[1] + 0.25, r"$a_A=0$ (constant speed)", fontsize=9.0,
-                color=COLORS["known"])
+                   COLORS["known"], r"$v_A=1.0\ \mathrm{m/s}\ \mathrm{(constant)},\ a_A=0$",
+                   label_offset=(0.45, -0.13))
         if solution:
             perpendicular = np.array([-math.sin(theta), math.cos(theta)])
             toward_A = (A - B) / np.linalg.norm(A - B)
@@ -2194,13 +2209,13 @@ def draw_linked_velocity(accel=False, solution=False):
         # Angular velocities are given from the preceding velocity step.
         draw_rotation_arrow(ax, (A + B) / 2.0, 0.34, -1, COLORS["known"], r"$\omega_{AB}=-2.828$",
                             start_deg=120, sweep_deg=190, label_offset=(-0.42, -0.08), alpha=0.92)
-        draw_rotation_arrow(ax, (B + C) / 2.0, 0.32, +1, COLORS["known"], r"$\omega_{BC}=2.828$",
+        draw_rotation_arrow(ax, (B + C) / 2.0 + np.array([0.45, -0.45]), 0.30, +1, COLORS["known"], r"$\omega_{BC}=2.828$",
                             start_deg=-55, sweep_deg=190, label_offset=(0.65, -0.02), alpha=0.92)
         if solution:
             start = B + np.array([0.65, 0.08])
             draw_arrow(ax, start, _schematic_vector_end(start, data["a_b"], 1.12),
                        COLORS["resultant"], r"$a_B$", label_offset=(0.14, 0.0))
-            start = (B + C) / 2.0 + np.array([-1.25, 0.35])
+            start = (B + C) / 2.0 + np.array([-1.47, 0.35])
             draw_arrow(ax, start, _schematic_vector_end(start, data["a_cb_t"], 0.98),
                        COLORS["tangent"], r"$a^t_{C/B}$", label_offset=(0.0, 0.13))
             start = (B + C) / 2.0 + np.array([-0.85, -0.75])
@@ -2213,12 +2228,12 @@ def draw_linked_velocity(accel=False, solution=False):
             start = B + np.array([0.60, 0.06])
             draw_arrow(ax, start, _schematic_vector_end(start, data["v_b"], 1.12),
                        COLORS["resultant"], r"$v_B$", label_offset=(0.12, 0.0))
-            start = (B + C) / 2.0 + np.array([-1.38, -0.05])
+            start = (B + C) / 2.0 + np.array([-1.60, -0.05])
             draw_arrow(ax, start, _schematic_vector_end(start, data["v_cb"], 1.00),
                        COLORS["relative"], r"$v_{C/B}$", label_offset=(0.0, 0.13))
             draw_rotation_arrow(ax, (A + B) / 2.0, 0.34, -1, COLORS["resultant"], r"$\omega_{AB}=-2.828$",
                                 start_deg=120, sweep_deg=190, label_offset=(-0.42, -0.08))
-            draw_rotation_arrow(ax, (B + C) / 2.0, 0.32, +1, COLORS["resultant"], r"$\omega_{BC}=2.828$",
+            draw_rotation_arrow(ax, (B + C) / 2.0 + np.array([0.45, -0.45]), 0.30, +1, COLORS["resultant"], r"$\omega_{BC}=2.828$",
                                 start_deg=-55, sweep_deg=190, label_offset=(0.65, -0.02))
     finish_axis(ax, (0.05, 6.15), (-1.32, 4.12), transparent=solution)
     return fig
@@ -2228,15 +2243,16 @@ def draw_ic_velocity(solution=False):
     fig, ax = plt.subplots(figsize=(8.5, 4.8))
     A, B, C = _ic_geometry(ax)
     draw_rotation_arrow(ax, A, 0.42, +1, COLORS["known"], r"$\omega_{AB}=6\ \mathrm{rad/s}$",
-                        start_deg=-75, sweep_deg=175, label_offset=(-0.20, -0.05))
+                        start_deg=-75, sweep_deg=175, label_offset=(-0.72, -0.62))
     if solution:
         vB_direction = np.array([-1.0, 1.0]) / math.sqrt(2.0)
-        draw_arrow(ax, B, B + 0.95 * vB_direction, COLORS["known"], r"$|v_B|=1.20$",
-                   label_offset=(-0.25, 0.24))
-        draw_arrow(ax, C + np.array([0.0, 0.34]), C + np.array([-1.18, 0.34]),
-                   COLORS["resultant"], r"$|v_C|=1.338$", label_offset=(0.0, 0.13))
+        draw_arrow(ax, B, B + 0.95 * vB_direction, COLORS["known"], r"$|v_B|=1.20\ \mathrm{m/s}$",
+                   label_offset=(0.0, 0.52))
+        ax.plot([C[0], C[0]], [C[1] - 0.22, C[1] - 0.62], color=COLORS["resultant"], lw=1.0, ls=":")
+        draw_arrow(ax, C + np.array([0.0, -0.62]), C + np.array([-1.18, -0.62]),
+                   COLORS["resultant"], r"$|v_C|=1.338\ \mathrm{m/s}$", label_offset=(0.0, -0.17))
         data = solve_guided_problem("V4")
-        IC = A + 6.0 * data["ic"]
+        IC = A + IC_DRAWING_SCALE * data["ic"]
         ax.plot([C[0], C[0]], [C[1], IC[1]], color=COLORS["construct"], lw=1.6, ls="--")
         ax.plot([B[0], IC[0]], [B[1], IC[1]], color=COLORS["construct"], lw=1.6, ls="--")
         ax.plot(*IC, "o", color=COLORS["relative"], ms=6, zorder=6)
@@ -2247,7 +2263,7 @@ def draw_ic_velocity(solution=False):
                 color=COLORS["construct"], rotation=45)
         draw_rotation_arrow(ax, IC, 0.40, -1, COLORS["resultant"], r"$\omega_{BC}=-1.960\ \mathrm{rad/s}$",
                             start_deg=110, sweep_deg=185, label_offset=(-0.45, -0.10))
-    finish_axis(ax, (-0.15, 6.10), (-1.02, 5.12 if solution else 3.05), transparent=solution)
+    finish_axis(ax, (-0.60, 6.10), (-1.30, 5.60 if solution else 3.05), transparent=solution)
     return fig
 
 
@@ -2256,14 +2272,14 @@ def draw_belt_velocity(accel=False, solution=False):
     A, rA, B, rB = _belt_geometry(ax, crossed=accel)
     if accel:
         draw_rotation_arrow(ax, A, 0.58, +1, COLORS["known"], r"$\alpha_A=3\ \mathrm{rad/s^2}$",
-                            start_deg=-55, sweep_deg=200, label_offset=(-0.20, 0.02))
+                            start_deg=-55, sweep_deg=200, label_offset=(0.0, 0.26))
         P = B + np.array([0.0, rB])
         draw_pin(ax, P, "P", (0.11, 0.05))
         ax.text(0.55, 0.37, r"$\omega_A(0)=0,\quad t=3\ \mathrm{s}$", fontsize=9.1, color=COLORS["known"])
         if solution:
             draw_rotation_arrow(ax, B, 0.38, -1, COLORS["resultant"],
                                 r"$\omega_B=-14.4,\ \alpha_B=-4.8$", start_deg=125, sweep_deg=200,
-                                label_offset=(0.05, -0.10))
+                                label_offset=(-0.45, -1.86))
             for start, end in _belt_tangent_segments(A, rA, B, rB, True):
                 midpoint = (start + end) / 2.0
                 tangent = (end - start) / np.linalg.norm(end - start)
@@ -2274,10 +2290,10 @@ def draw_belt_velocity(accel=False, solution=False):
                            COLORS["relative"], None, lw=1.9, alpha=0.88)
     else:
         draw_rotation_arrow(ax, A, 0.58, +1, COLORS["known"], r"$\omega_A=12\ \mathrm{rad/s}$",
-                            start_deg=-55, sweep_deg=200, label_offset=(-0.18, 0.02))
+                            start_deg=-55, sweep_deg=200, label_offset=(0.0, 0.26))
         if solution:
             draw_rotation_arrow(ax, B, 0.38, +1, COLORS["resultant"], r"$\omega_B=19.2\ \mathrm{rad/s}$",
-                                start_deg=-55, sweep_deg=200, label_offset=(0.10, -0.08))
+                                start_deg=-55, sweep_deg=200, label_offset=(0.0, -1.86))
             for start, end in _belt_tangent_segments(A, rA, B, rB, False):
                 midpoint = (start + end) / 2.0
                 tangent = (end - start) / np.linalg.norm(end - start)
@@ -2442,7 +2458,10 @@ def render_problem_figure(problem):
 def _show_figure(fig):
     """Release figure managers as well as artists after each Streamlit render."""
     try:
-        st.pyplot(fig, clear_figure=True, width="stretch")
+        try:
+            st.pyplot(fig, clear_figure=True, width="stretch")
+        except TypeError:
+            st.pyplot(fig, clear_figure=True, use_container_width=True)
     finally:
         plt.close(fig)
 
@@ -2746,8 +2765,12 @@ def render_learn_tab(topic):
 
 
 def is_close(student, target, tol):
+    """Accept the stated absolute tolerance or 0.5 % of the target, whichever is larger."""
     try:
-        return abs(float(student) - float(target)) <= tol
+        student = float(student)
+        target = float(target)
+        allowed = max(float(tol), 0.005 * abs(target))
+        return abs(student - target) <= allowed
     except Exception:
         return False
 
@@ -2774,9 +2797,13 @@ def render_direction_tab(problem, mode):
         displayed_response = st.radio(
             f"Direction question {i+1}",
             display_options,
+            index=None,
             key=f"{problem['id']}_dir_{i}",
             label_visibility="collapsed",
         )
+        if displayed_response is None:
+            st.caption("Choose an answer to see feedback." if mode == "Practice" else "Choose an answer.")
+            continue
         response = item["options"][display_options.index(displayed_response)]
         if mode == "Practice":
             if response == item["correct"]:
@@ -2809,9 +2836,13 @@ def render_equation_tab(problem, mode):
             displayed_response = st.radio(
                 f"Equation question {i+1}",
                 display_options,
+                index=None,
                 key=f"{problem['id']}_eq_{i}",
                 label_visibility="collapsed",
             )
+            if displayed_response is None:
+                st.caption("Choose an answer to see feedback." if mode == "Practice" else "Choose an answer.")
+                continue
             response = item["options"][display_options.index(displayed_response)]
             if mode == "Practice":
                 if response == item["correct"]:
