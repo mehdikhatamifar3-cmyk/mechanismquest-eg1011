@@ -80,7 +80,7 @@ def load_logo_b64():
 
 
 LOGO_B64 = load_logo_b64()
-APP_BUILD_ID = "encoding-proof-diagrams-2026-11-21-r2"
+APP_BUILD_ID = "encoding-proof-diagrams-random-ab-bc-2026-11-21-r3"
 
 COLORS = {
     "known": "#2563eb",      # blue
@@ -937,6 +937,331 @@ PROBLEMS = [
 ]
 
 
+# Randomised two-link activity.  The lengths and prescribed motion of AB stay
+# constant.  Only the three displayed angles vary.  Discrete angle sets make
+# it possible to exhaustively validate every combination at startup.
+RANDOM_AB_ANGLES = (70, 80, 90, 100, 110)
+RANDOM_BC_ANGLES = (25, 35, 45, 55, 65)       # below the negative x-axis
+RANDOM_GUIDE_ANGLES = (15, 25, 35, 45, 55)    # positive motion: down-left
+RANDOM_L_AB = 2.00
+RANDOM_L_BC = 1.75
+RANDOM_OMEGA_AB = 4.00
+RANDOM_ALPHA_AB = 5.00
+
+
+def _unit_from_degrees(angle_deg):
+    angle = math.radians(float(angle_deg))
+    return np.array([math.cos(angle), math.sin(angle)], dtype=float)
+
+
+def _random_combination_valid(theta_ab_deg, theta_bc_down_deg, guide_down_deg):
+    e_ab = _unit_from_degrees(theta_ab_deg)
+    e_bc = _unit_from_degrees(180.0 + float(theta_bc_down_deg))
+    guide = _unit_from_degrees(180.0 + float(guide_down_deg))
+    C = RANDOM_L_AB * e_ab + RANDOM_L_BC * e_bc
+    return (
+        abs(float(np.dot(guide, e_bc))) >= 0.45
+        and C[1] > 0.12
+        and float(np.linalg.norm(C)) > 0.35
+    )
+
+
+def solve_random_two_link(theta_ab_deg, theta_bc_down_deg, guide_down_deg):
+    """Solve one instantaneous AB-BC geometry using CCW-positive vectors.
+
+    theta_ab_deg is measured CCW from +x.  The BC and guide angles are both
+    measured below the negative x-axis, so their absolute angles are
+    180 degrees plus the supplied values.  Positive slider motion follows the
+    down-left guide arrow displayed at C.
+    """
+    theta_bc_abs = 180.0 + float(theta_bc_down_deg)
+    guide_abs = 180.0 + float(guide_down_deg)
+    e_ab = _unit_from_degrees(theta_ab_deg)
+    n_ab = np.array([-e_ab[1], e_ab[0]])
+    e_bc = _unit_from_degrees(theta_bc_abs)
+    n_bc = np.array([-e_bc[1], e_bc[0]])
+    guide = _unit_from_degrees(guide_abs)
+
+    r_ba = RANDOM_L_AB * e_ab
+    r_cb = RANDOM_L_BC * e_bc
+    A = np.array([0.0, 0.0])
+    B = A + r_ba
+    C = B + r_cb
+    denominator = float(np.dot(guide, e_bc))
+    if abs(denominator) < 0.45:
+        raise ValueError("Guide is too close to perpendicular to BC for a stable activity.")
+    if C[1] <= 0.12 or np.linalg.norm(C - A) <= 0.35:
+        raise ValueError("Generated geometry does not meet the diagram-clearance rules.")
+
+    # Member AB: fixed-axis rotation about A.
+    v_b = RANDOM_OMEGA_AB * RANDOM_L_AB * n_ab
+    a_b_t = RANDOM_ALPHA_AB * RANDOM_L_AB * n_ab
+    a_b_n = -(RANDOM_OMEGA_AB ** 2) * RANDOM_L_AB * e_ab
+    a_b = a_b_t + a_b_n
+
+    # Member BC: slider compatibility.  Dotting the vector equation with e_BC
+    # removes the unknown rotational (normal-to-link) velocity term.
+    v_c_signed = float(np.dot(v_b, e_bc) / denominator)
+    v_c = v_c_signed * guide
+    omega_bc = float(np.dot(v_c - v_b, n_bc) / RANDOM_L_BC)
+    v_cb = omega_bc * RANDOM_L_BC * n_bc
+
+    # The fixed straight guide gives a_C = a_C_signed * guide.  Dotting the
+    # acceleration equation with e_BC removes alpha_BC.
+    a_c_signed = float(
+        (np.dot(a_b, e_bc) - (omega_bc ** 2) * RANDOM_L_BC) / denominator
+    )
+    a_c = a_c_signed * guide
+    a_cb_n = -(omega_bc ** 2) * RANDOM_L_BC * e_bc
+    alpha_bc = float(np.dot(a_c - a_b - a_cb_n, n_bc) / RANDOM_L_BC)
+    a_cb_t = alpha_bc * RANDOM_L_BC * n_bc
+
+    return {
+        "theta_ab": float(theta_ab_deg),
+        "theta_bc_down": float(theta_bc_down_deg),
+        "theta_bc_abs": theta_bc_abs,
+        "guide_down": float(guide_down_deg),
+        "guide_abs": guide_abs,
+        "A": A, "B": B, "C": C,
+        "e_ab": e_ab, "n_ab": n_ab, "e_bc": e_bc, "n_bc": n_bc,
+        "guide": guide, "r_ba": r_ba, "r_cb": r_cb,
+        "v_b": v_b, "v_c": v_c, "v_cb": v_cb,
+        "a_b_t": a_b_t, "a_b_n": a_b_n, "a_b": a_b,
+        "a_cb_t": a_cb_t, "a_cb_n": a_cb_n, "a_c": a_c,
+        "v_c_signed": v_c_signed, "a_c_signed": a_c_signed,
+        "omega_bc": omega_bc, "alpha_bc": alpha_bc,
+        "denominator": denominator,
+    }
+
+
+def _vec_latex(vector, unit):
+    return (
+        f"({vector[0]:.4f}\\,\\mathbf{{i}}{vector[1]:+.4f}\\,\\mathbf{{j}})"
+        f"\\ \\mathrm{{{unit}}}"
+    )
+
+
+def make_random_two_link_problem(seed):
+    """Create a deterministic problem state from the displayed attempt seed."""
+    rng = np.random.default_rng(int(seed))
+    candidates = [
+        (theta, beta, guide)
+        for theta in RANDOM_AB_ANGLES
+        for beta in RANDOM_BC_ANGLES
+        for guide in RANDOM_GUIDE_ANGLES
+        if _random_combination_valid(theta, beta, guide)
+    ]
+    theta_ab, theta_bc, guide_angle = candidates[int(rng.integers(0, len(candidates)))]
+    data = solve_random_two_link(theta_ab, theta_bc, guide_angle)
+
+    rb = data["r_ba"]
+    rc = data["r_cb"]
+    d = data["guide"]
+    vb = data["v_b"]
+    vc = data["v_c"]
+    vcb = data["v_cb"]
+    abt = data["a_b_t"]
+    abn = data["a_b_n"]
+    ab = data["a_b"]
+    act = data["a_cb_t"]
+    acn = data["a_cb_n"]
+    ac = data["a_c"]
+    omega_bc = data["omega_bc"]
+    alpha_bc = data["alpha_bc"]
+    v_c_signed = data["v_c_signed"]
+    a_c_signed = data["a_c_signed"]
+    den = data["denominator"]
+
+    sign_omega = "counterclockwise" if omega_bc >= 0.0 else "clockwise"
+    sign_alpha = "counterclockwise" if alpha_bc >= 0.0 else "clockwise"
+    sign_vc = "along the displayed +s_C arrow" if v_c_signed >= 0.0 else "opposite the displayed +s_C arrow"
+    sign_ac = "along the displayed +s_C arrow" if a_c_signed >= 0.0 else "opposite the displayed +s_C arrow"
+
+    groups = [
+        (
+            "1. Sign convention and geometry",
+            [
+                r"+x\text{ is right},\quad +y\text{ is up},\quad +\mathbf{k}\text{ and positive }\omega,\alpha\text{ are CCW}",
+                rf"\mathbf r_{{B/A}}={RANDOM_L_AB:.2f}(\cos {theta_ab}^\circ\,\mathbf i+\sin {theta_ab}^\circ\,\mathbf j)={_vec_latex(rb, 'm')}",
+                rf"\mathbf r_{{C/B}}={RANDOM_L_BC:.2f}(\cos {180 + theta_bc}^\circ\,\mathbf i+\sin {180 + theta_bc}^\circ\,\mathbf j)={_vec_latex(rc, 'm')}",
+                rf"\mathbf d_C=(\cos {180 + guide_angle}^\circ\,\mathbf i+\sin {180 + guide_angle}^\circ\,\mathbf j)=({d[0]:.4f}\mathbf i{d[1]:+.4f}\mathbf j)",
+                rf"\mathbf v_C=s_C\mathbf d_C,\quad \mathbf a_C=\ddot s_C\mathbf d_C,\quad \mathbf d_C\cdot\mathbf e_{{BC}}={den:.4f}\neq0",
+            ],
+        ),
+        (
+            "2. Member AB: velocity of B",
+            [
+                rf"\boldsymbol\omega_{{AB}}={RANDOM_OMEGA_AB:.2f}\mathbf k\ \mathrm{{rad/s}}",
+                r"\mathbf v_B=\mathbf v_A+\boldsymbol\omega_{AB}\times\mathbf r_{B/A},\qquad \mathbf v_A=\mathbf0",
+                rf"\mathbf v_B={RANDOM_OMEGA_AB:.2f}\mathbf k\times({_vec_latex(rb, 'm')})={_vec_latex(vb, 'm/s')}",
+                rf"|\mathbf v_B|={np.linalg.norm(vb):.4f}\ \mathrm{{m/s}},\qquad \mathbf v_B\perp AB",
+            ],
+        ),
+        (
+            "3. Member BC: relative velocity and x-y equations",
+            [
+                r"\mathbf v_C=\mathbf v_B+\boldsymbol\omega_{BC}\times\mathbf r_{C/B}",
+                rf"s_C({d[0]:.4f}\mathbf i{d[1]:+.4f}\mathbf j)=({_vec_latex(vb, 'm/s')})+\omega_{{BC}}\mathbf k\times({_vec_latex(rc, 'm')})",
+                rf"x:\quad {d[0]:.4f}s_C={vb[0]:.4f}{(-rc[1]):+.4f}\omega_{{BC}}",
+                rf"y:\quad {d[1]:.4f}s_C={vb[1]:.4f}{rc[0]:+.4f}\omega_{{BC}}",
+                rf"s_C=\frac{{\mathbf v_B\cdot\mathbf e_{{BC}}}}{{\mathbf d_C\cdot\mathbf e_{{BC}}}}={v_c_signed:.4f}\ \mathrm{{m/s}}",
+                rf"\omega_{{BC}}=\frac{{(\mathbf v_C-\mathbf v_B)\cdot\mathbf n_{{BC}}}}{{L_{{BC}}}}={omega_bc:.4f}\ \mathrm{{rad/s}}\quad({sign_omega})",
+                rf"\mathbf v_{{C/B}}=\omega_{{BC}}\mathbf k\times\mathbf r_{{C/B}}={_vec_latex(vcb, 'm/s')}",
+                rf"\mathbf v_C={_vec_latex(vc, 'm/s')},\quad |\mathbf v_C|={abs(v_c_signed):.4f}\ \mathrm{{m/s}}\quad({sign_vc})",
+            ],
+        ),
+        (
+            "4. Member AB: acceleration of B",
+            [
+                rf"\boldsymbol\alpha_{{AB}}={RANDOM_ALPHA_AB:.2f}\mathbf k\ \mathrm{{rad/s^2}}",
+                r"\mathbf a_B=\mathbf a_A+\boldsymbol\alpha_{AB}\times\mathbf r_{B/A}-\omega_{AB}^2\mathbf r_{B/A},\qquad \mathbf a_A=\mathbf0",
+                rf"\mathbf a^t_{{B/A}}=\boldsymbol\alpha_{{AB}}\times\mathbf r_{{B/A}}={_vec_latex(abt, 'm/s^2')},\quad |a^t_{{B/A}}|={np.linalg.norm(abt):.4f}\ \mathrm{{m/s^2}}",
+                rf"\mathbf a^n_{{B/A}}=-\omega_{{AB}}^2\mathbf r_{{B/A}}={_vec_latex(abn, 'm/s^2')},\quad |a^n_{{B/A}}|={np.linalg.norm(abn):.4f}\ \mathrm{{m/s^2}}",
+                rf"\mathbf a_B=\mathbf a^t_{{B/A}}+\mathbf a^n_{{B/A}}={_vec_latex(ab, 'm/s^2')}",
+                rf"|\mathbf a_B|={np.linalg.norm(ab):.4f}\ \mathrm{{m/s^2}}",
+            ],
+        ),
+        (
+            "5. Member BC: relative acceleration and x-y equations",
+            [
+                r"\mathbf a_C=\mathbf a_B+\boldsymbol\alpha_{BC}\times\mathbf r_{C/B}-\omega_{BC}^2\mathbf r_{C/B}",
+                rf"x:\quad {d[0]:.4f}\ddot s_C={ab[0]:.4f}{(-rc[1]):+.4f}\alpha_{{BC}}{(-omega_bc**2*rc[0]):+.4f}",
+                rf"y:\quad {d[1]:.4f}\ddot s_C={ab[1]:.4f}{rc[0]:+.4f}\alpha_{{BC}}{(-omega_bc**2*rc[1]):+.4f}",
+                rf"\ddot s_C=\frac{{\mathbf a_B\cdot\mathbf e_{{BC}}-\omega_{{BC}}^2L_{{BC}}}}{{\mathbf d_C\cdot\mathbf e_{{BC}}}}={a_c_signed:.4f}\ \mathrm{{m/s^2}}",
+                rf"\alpha_{{BC}}=\frac{{(\mathbf a_C-\mathbf a_B-\mathbf a^n_{{C/B}})\cdot\mathbf n_{{BC}}}}{{L_{{BC}}}}={alpha_bc:.4f}\ \mathrm{{rad/s^2}}\quad({sign_alpha})",
+                rf"\mathbf a^t_{{C/B}}=\alpha_{{BC}}\mathbf k\times\mathbf r_{{C/B}}={_vec_latex(act, 'm/s^2')},\quad |a^t_{{C/B}}|={np.linalg.norm(act):.4f}\ \mathrm{{m/s^2}}",
+                rf"\mathbf a^n_{{C/B}}=-\omega_{{BC}}^2\mathbf r_{{C/B}}={_vec_latex(acn, 'm/s^2')},\quad |a^n_{{C/B}}|={np.linalg.norm(acn):.4f}\ \mathrm{{m/s^2}}",
+                rf"\mathbf a_C=\mathbf a_B+\mathbf a^t_{{C/B}}+\mathbf a^n_{{C/B}}={_vec_latex(ac, 'm/s^2')}",
+                rf"|\mathbf a_C|={abs(a_c_signed):.4f}\ \mathrm{{m/s^2}}\quad({sign_ac})",
+            ],
+        ),
+        (
+            "6. Numerical closure checks",
+            [
+                rf"\mathbf v_B+\mathbf v_{{C/B}}-\mathbf v_C={_vec_latex(vb + vcb - vc, 'm/s')}",
+                rf"\mathbf a_B+\mathbf a^t_{{C/B}}+\mathbf a^n_{{C/B}}-\mathbf a_C={_vec_latex(ab + act + acn - ac, 'm/s^2')}",
+            ],
+        ),
+    ]
+
+    return {
+        "id": "R-" + str(int(seed)),
+        "topic": "Combined velocity and acceleration",
+        "level": "Random",
+        "title": "Randomized two-member AB-BC mechanism",
+        "difficulty": "Challenging",
+        "diagram": "random_two_link",
+        "attempt_seed": int(seed),
+        "kinematics": data,
+        "description": (
+            f"Point A is fixed. Member AB ({RANDOM_L_AB:.2f} m) is at {theta_ab}\u00b0 counterclockwise from +x. "
+            f"Member BC ({RANDOM_L_BC:.2f} m) is at {theta_bc}\u00b0 below the negative x-axis. "
+            f"Slider C is restricted to the straight guide whose positive direction is {guide_angle}\u00b0 below the negative x-axis. "
+            f"At this instant, \u03c9_AB = {RANDOM_OMEGA_AB:.2f} rad/s CCW and \u03b1_AB = {RANDOM_ALPHA_AB:.2f} rad/s\u00b2 CCW. "
+            "Determine the velocities and accelerations of B and C and the angular velocity and angular acceleration of BC."
+        ),
+        "givens": [
+            f"Attempt seed = {int(seed)} (re-enter this seed to reproduce the geometry)",
+            f"AB = {RANDOM_L_AB:.2f} m; BC = {RANDOM_L_BC:.2f} m",
+            f"Angle of AB = {theta_ab}\u00b0 from +x",
+            f"Angle of BC = {theta_bc}\u00b0 below -x",
+            f"Positive guide direction at C = {guide_angle}\u00b0 below -x",
+            f"\u03c9_AB = {RANDOM_OMEGA_AB:.2f} rad/s CCW; \u03b1_AB = {RANDOM_ALPHA_AB:.2f} rad/s\u00b2 CCW",
+        ],
+        "direction_questions": [
+            {
+                "q": "What is the direction of velocity of point B?",
+                "options": ["Along AB", "Perpendicular to AB", "Along BC", "Along the guide at C"],
+                "correct": "Perpendicular to AB",
+                "why": "AB rotates about fixed point A, so v_B is perpendicular to AB.",
+            },
+            {
+                "q": "What is the permitted direction of velocity and acceleration of C?",
+                "options": ["Along its straight guide", "Perpendicular to its guide", "Along BC only", "Any direction"],
+                "correct": "Along its straight guide",
+                "why": "A slider in a fixed straight guide can have velocity and acceleration only along the guide.",
+            },
+            {
+                "q": "Where does the relative normal acceleration a_n(C/B) point?",
+                "options": ["From C toward B", "From B toward C", "Perpendicular to BC", "Along the guide"],
+                "correct": "From C toward B",
+                "why": "The relative normal term is -omega_BC squared times r_C/B, so it points from C toward B.",
+            },
+        ],
+        "equation_questions": [
+            {
+                "q": "Choose the correct relative-velocity equation for member BC.",
+                "options": [
+                    "v_C = v_B + \u03c9_BC \u00d7 r_C/B",
+                    "v_C = v_B + \u03b1_BC \u00d7 r_C/B",
+                    "v_C = a_B + \u03c9_BC \u00d7 r_C/B",
+                    "v_C = \u03c9_AB r_C/B only",
+                ],
+                "correct": "v_C = v_B + \u03c9_BC \u00d7 r_C/B",
+                "why": "Points B and C lie on the same rigid member BC.",
+            },
+            {
+                "q": "Choose the complete relative-acceleration equation for member BC.",
+                "options": [
+                    "a_C = a_B + \u03b1_BC \u00d7 r_C/B - \u03c9_BC\u00b2 r_C/B",
+                    "a_C = a_B + \u03c9_BC \u00d7 r_C/B",
+                    "a_C = a_B + \u03b1_BC \u00d7 r_C/B",
+                    "a_C = \u03c9_BC\u00b2 r_C/B only",
+                ],
+                "correct": "a_C = a_B + \u03b1_BC \u00d7 r_C/B - \u03c9_BC\u00b2 r_C/B",
+                "why": "Both tangential and normal relative-acceleration terms are required.",
+            },
+        ],
+        "solve_outputs": [
+            {"label": "Speed of point B", "key": "vBmag", "value": float(np.linalg.norm(vb)), "tol": 0.03, "unit": "m/s"},
+            {"label": "Angular velocity \u03c9_BC (CCW positive)", "key": "omegaBC", "value": omega_bc, "tol": 0.03, "unit": "rad/s"},
+            {"label": "Velocity of C along +s_C", "key": "vC", "value": v_c_signed, "tol": 0.04, "unit": "m/s"},
+            {"label": "Acceleration magnitude of point B", "key": "aBmag", "value": float(np.linalg.norm(ab)), "tol": 0.05, "unit": "m/s\u00b2"},
+            {"label": "Angular acceleration \u03b1_BC (CCW positive)", "key": "alphaBC", "value": alpha_bc, "tol": 0.05, "unit": "rad/s\u00b2"},
+            {"label": "Acceleration of C along +s_C", "key": "aC", "value": a_c_signed, "tol": 0.06, "unit": "m/s\u00b2"},
+        ],
+        "vector_lines": [
+            groups[0][1][1], groups[0][1][2], groups[0][1][3],
+        ],
+        "solution_groups": groups,
+        "solution_lines": [line for _, lines in groups for line in lines],
+        "teaching_point": (
+            "The slider constraint supplies the direction of both v_C and a_C. "
+            "The velocity analysis must be completed before acceleration because the normal term for BC uses \u03c9_BC\u00b2. "
+            "A negative signed result means the real sense is opposite to the assumed positive arrow or CCW convention."
+        ),
+    }
+
+
+def validate_randomized_activity():
+    """Exhaustively verify all permitted angle combinations and vector closure."""
+    valid_count = 0
+    for theta_ab in RANDOM_AB_ANGLES:
+        for theta_bc in RANDOM_BC_ANGLES:
+            for guide_angle in RANDOM_GUIDE_ANGLES:
+                if not _random_combination_valid(theta_ab, theta_bc, guide_angle):
+                    continue
+                data = solve_random_two_link(theta_ab, theta_bc, guide_angle)
+                valid_count += 1
+                arrays = [
+                    data["v_b"], data["v_c"], data["v_cb"], data["a_b"],
+                    data["a_cb_t"], data["a_cb_n"], data["a_c"],
+                ]
+                if not all(np.all(np.isfinite(item)) for item in arrays):
+                    raise RuntimeError("Non-finite randomized two-link result.")
+                if np.linalg.norm(data["v_b"] + data["v_cb"] - data["v_c"]) > 1.0e-9:
+                    raise RuntimeError("Randomized relative-velocity closure failed.")
+                if np.linalg.norm(data["a_b"] + data["a_cb_t"] + data["a_cb_n"] - data["a_c"]) > 1.0e-8:
+                    raise RuntimeError("Randomized relative-acceleration closure failed.")
+                if abs(np.cross(data["guide"], data["v_c"])) > 1.0e-9:
+                    raise RuntimeError("Randomized slider velocity violates its guide.")
+                if abs(np.cross(data["guide"], data["a_c"])) > 1.0e-8:
+                    raise RuntimeError("Randomized slider acceleration violates its guide.")
+    if valid_count < 100:
+        raise RuntimeError("Too few valid randomized two-link geometries.")
+    return True
+
+
 def validate_problem_catalog():
     """Validate all ten instructional states and their independent targets."""
     expected_ids = ["V1", "V2", "V3", "V4", "V5", "V6", "A1", "A2", "A3", "A4"]
@@ -996,6 +1321,7 @@ def validate_problem_catalog():
 
 
 validate_problem_catalog()
+validate_randomized_activity()
 
 
 def get_problem(topic, level):
@@ -1263,6 +1589,182 @@ def _gear_geometry(ax):
     ax.text(1.45, 4.02, "external mesh", fontsize=8.7, color=COLORS["construct"], ha="center")
     ax.text(3.40, 4.02, "external mesh", fontsize=8.7, color=COLORS["construct"], ha="center")
     return centres, radii
+
+
+def _random_two_link_geometry(ax, problem, transparent=False):
+    """Draw the randomized geometry and only its prescribed motion data."""
+    data = problem["kinematics"]
+    A, B, C = data["A"], data["B"], data["C"]
+    guide = data["guide"]
+    guide_normal = np.array([-guide[1], guide[0]])
+
+    # Two guide rails and a small slider centred at C.
+    for offset in (-0.12, 0.12):
+        p1 = C - 1.25 * guide + offset * guide_normal
+        p2 = C + 1.25 * guide + offset * guide_normal
+        ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color=COLORS["guide"], lw=2.0, zorder=1)
+    phi = data["guide_abs"]
+    ax.add_patch(Rectangle(
+        (C[0] - 0.24, C[1] - 0.14), 0.48, 0.28,
+        angle=phi, rotation_point="center", fill=False,
+        ec=COLORS["link"], lw=1.9, zorder=3,
+    ))
+
+    ax.plot([A[0], B[0]], [A[1], B[1]], color=COLORS["link"], lw=3.0, zorder=2)
+    ax.plot([B[0], C[0]], [B[1], C[1]], color=COLORS["link"], lw=3.0, zorder=2)
+    draw_pin(ax, A, "A", (0.10, -0.27), fixed=True)
+    draw_pin(ax, B, "B", (0.10, 0.10))
+    draw_pin(ax, C, "C", (-0.28, 0.13))
+
+    theta_ab = data["theta_ab"]
+    theta_bc = data["theta_bc_down"]
+    guide_down = data["guide_down"]
+    ax.plot([A[0], A[0] + 0.92], [A[1], A[1]], color=COLORS["construct"], lw=1.1, ls="--")
+    draw_angle_arc(ax, A, 0.48, 0.0, theta_ab, rf"$\theta_{{AB}}={theta_ab:.0f}^\circ$",
+                   COLORS["construct"], 0.76)
+    ax.plot([B[0], B[0] - 0.90], [B[1], B[1]], color=COLORS["construct"], lw=1.1, ls="--")
+    draw_angle_arc(ax, B, 0.44, 180.0, 180.0 + theta_bc,
+                   rf"$\theta_{{BC}}={theta_bc:.0f}^\circ$", COLORS["construct"], 0.95)
+
+    # Dimension labels are offset from the link centrelines.
+    mid_ab = (A + B) / 2.0
+    mid_bc = (B + C) / 2.0
+    ab_label = mid_ab - 0.22 * data["n_ab"]
+    bc_label = mid_bc + 0.42 * data["e_bc"] - 0.20 * data["n_bc"]
+    if not transparent:
+        ax.text(ab_label[0], ab_label[1], f"AB = {RANDOM_L_AB:.2f} m",
+                fontsize=9.5, color=COLORS["link"], rotation=theta_ab,
+                ha="center", va="center")
+        ax.text(bc_label[0], bc_label[1], f"BC = {RANDOM_L_BC:.2f} m",
+                fontsize=9.5, color=COLORS["link"], rotation=theta_bc,
+                ha="center", va="center")
+
+    # The guide arrow is a constraint datum, not a solved velocity vector.
+    arrow_start = C - 0.12 * guide
+    arrow_end = C + 0.83 * guide
+    draw_arrow(ax, arrow_start, arrow_end, COLORS["known"], r"$+s_C$ permitted",
+               lw=2.0, label_offset=(-0.05, -0.16))
+    ref = C + 0.72 * np.array([-1.0, 0.0])
+    ax.plot([C[0], ref[0]], [C[1], ref[1]], color=COLORS["construct"], lw=1.0, ls="--")
+    draw_angle_arc(ax, C, 0.38, 180.0, 180.0 + guide_down,
+                   rf"$\gamma_C={guide_down:.0f}^\circ$", COLORS["known"], 0.61)
+
+    draw_rotation_arrow(ax, A + np.array([1.00, -0.02]), 0.28, +1, COLORS["known"],
+                        rf"$\omega_{{AB}}={RANDOM_OMEGA_AB:.0f}$", start_deg=-55, sweep_deg=190,
+                        label_offset=(0.05, -0.10), alpha=0.92)
+    draw_rotation_arrow(ax, A + np.array([1.54, -0.02]), 0.24, +1, COLORS["tangent"],
+                        rf"$\alpha_{{AB}}={RANDOM_ALPHA_AB:.0f}$", start_deg=-55, sweep_deg=175,
+                        label_offset=(0.05, -0.10), alpha=0.92)
+    ax.text(A[0] + 0.30, A[1] - 0.76, r"$\omega$ in rad/s; $\alpha$ in rad/s$^2$",
+            fontsize=8.6, color=COLORS["construct"])
+
+    points = np.vstack([A, B, C, C - 1.25 * guide, C + 1.25 * guide])
+    finish_axis(
+        ax,
+        (float(points[:, 0].min() - 0.72), float(points[:, 0].max() + 1.92)),
+        (float(points[:, 1].min() - 0.72), float(points[:, 1].max() + 0.72)),
+        transparent=transparent,
+    )
+    return A, B, C
+
+
+def _schematic_vector_end(start, vector, length=0.85):
+    magnitude = float(np.linalg.norm(vector))
+    if magnitude <= 1.0e-12:
+        return np.asarray(start, dtype=float)
+    return np.asarray(start, dtype=float) + length * np.asarray(vector, dtype=float) / magnitude
+
+
+def draw_random_two_link(problem, stage="question"):
+    """Draw bare question geometry or a transparent velocity/acceleration view."""
+    fig, ax = plt.subplots(figsize=(8.8, 5.2))
+    transparent = stage != "question"
+    A, B, C = _random_two_link_geometry(ax, problem, transparent=transparent)
+    data = problem["kinematics"]
+    midpoint = (B + C) / 2.0
+
+    if stage == "velocity":
+        draw_arrow(ax, B + np.array([0.12, 0.05]),
+                   _schematic_vector_end(B + np.array([0.12, 0.05]), data["v_b"], 0.92),
+                   COLORS["known"], rf"$\mathbf{{v}}_B={np.linalg.norm(data['v_b']):.2f}$",
+                   label_offset=(-0.18, 0.14))
+        draw_arrow(ax, C + np.array([-0.05, -0.05]),
+                   _schematic_vector_end(C + np.array([-0.05, -0.05]), data["v_c"], 0.92),
+                   COLORS["resultant"], rf"$\mathbf{{v}}_C={abs(data['v_c_signed']):.2f}$",
+                   label_offset=(0.10, -0.16))
+        rel_start = midpoint + np.array([-0.08, -0.08])
+        draw_arrow(ax, rel_start, _schematic_vector_end(rel_start, data["v_cb"], 0.82),
+                   COLORS["relative"], r"$\mathbf{v}_{C/B}$", label_offset=(0.18, 0.10))
+        draw_rotation_arrow(ax, midpoint + np.array([0.45, 0.20]), 0.27,
+                            +1 if data["omega_bc"] >= 0.0 else -1, COLORS["relative"],
+                            rf"$\omega_{{BC}}={data['omega_bc']:.2f}$", start_deg=-45, sweep_deg=185,
+                            label_offset=(0.34, -0.10), alpha=0.90)
+    elif stage == "acceleration":
+        draw_arrow(ax, B + np.array([0.10, 0.03]),
+                   _schematic_vector_end(B + np.array([0.10, 0.03]), data["a_b"], 0.92),
+                   COLORS["known"], r"$\mathbf{a}_B$", label_offset=(-0.18, 0.14))
+        draw_arrow(ax, C + np.array([-0.05, -0.04]),
+                   _schematic_vector_end(C + np.array([-0.05, -0.04]), data["a_c"], 0.92),
+                   COLORS["resultant"], r"$\mathbf{a}_C$", label_offset=(0.10, -0.16))
+        t_start = midpoint + np.array([-0.18, 0.18])
+        n_start = midpoint + np.array([0.16, -0.18])
+        draw_arrow(ax, t_start, _schematic_vector_end(t_start, data["a_cb_t"], 0.70),
+                   COLORS["tangent"], r"$\mathbf{a}^{t}_{C/B}$", label_offset=(0.16, 0.12))
+        draw_arrow(ax, n_start, _schematic_vector_end(n_start, data["a_cb_n"], 0.70),
+                   COLORS["normal"], r"$\mathbf{a}^{n}_{C/B}$", label_offset=(-0.16, -0.12))
+        draw_rotation_arrow(ax, midpoint + np.array([0.50, 0.22]), 0.26,
+                            +1 if data["alpha_bc"] >= 0.0 else -1, COLORS["tangent"],
+                            rf"$\alpha_{{BC}}={data['alpha_bc']:.2f}$", start_deg=-45, sweep_deg=185,
+                            label_offset=(0.36, -0.10), alpha=0.90)
+    return fig
+
+
+def draw_random_vector_polygon(problem, quantity):
+    """Draw an actual-value head-to-tail closure polygon for the random attempt."""
+    data = problem["kinematics"]
+    if quantity == "velocity":
+        vectors = [data["v_b"], data["v_cb"]]
+        labels = [r"$\mathbf{v}_B$", r"$\mathbf{v}_{C/B}$"]
+        colors = [COLORS["known"], COLORS["relative"]]
+        resultant = data["v_c"]
+        result_label = r"$\mathbf{v}_C$"
+        title = "Velocity polygon: v_C = v_B + v_C/B"
+    else:
+        vectors = [data["a_b"], data["a_cb_t"], data["a_cb_n"]]
+        labels = [r"$\mathbf{a}_B$", r"$\mathbf{a}^{t}_{C/B}$", r"$\mathbf{a}^{n}_{C/B}$"]
+        colors = [COLORS["known"], COLORS["tangent"], COLORS["normal"]]
+        resultant = data["a_c"]
+        result_label = r"$\mathbf{a}_C$"
+        title = "Acceleration polygon: a_C = a_B + a_t + a_n"
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    origin = np.array([0.0, 0.0])
+    cursor = origin.copy()
+    points = [origin.copy()]
+    for vector, label, color in zip(vectors, labels, colors):
+        next_point = cursor + vector
+        draw_arrow(ax, cursor, next_point, color, label, lw=2.3, mutation=15,
+                   label_offset=(0.0, 0.05 * max(1.0, np.linalg.norm(resultant))))
+        cursor = next_point
+        points.append(cursor.copy())
+    draw_arrow(ax, origin, resultant, COLORS["resultant"], result_label, lw=2.1,
+               ls="--", mutation=15, label_offset=(0.0, -0.05 * max(1.0, np.linalg.norm(resultant))))
+    points.append(np.asarray(resultant, dtype=float))
+    all_points = np.vstack(points)
+    span = np.maximum(all_points.max(axis=0) - all_points.min(axis=0), np.array([1.0, 1.0]))
+    margin = 0.20 * float(max(span))
+    ax.axhline(0.0, color=COLORS["guide"], lw=0.9, ls=":", alpha=0.72)
+    ax.axvline(0.0, color=COLORS["guide"], lw=0.9, ls=":", alpha=0.72)
+    ax.text(float(all_points[:, 0].min() - 0.05 * span[0]),
+            float(all_points[:, 1].max() + 0.12 * span[1]), title,
+            fontsize=10.0, color=COLORS["construct"], weight="bold")
+    finish_axis(
+        ax,
+        (float(all_points[:, 0].min() - margin), float(all_points[:, 0].max() + margin)),
+        (float(all_points[:, 1].min() - margin), float(all_points[:, 1].max() + margin)),
+        transparent=True,
+    )
+    return fig
 
 
 def draw_fixed_velocity(solution=False):
@@ -1571,6 +2073,8 @@ def render_problem_figure(problem):
         fig = draw_belt_velocity(accel=True, solution=False)
     elif diagram == "gear_train":
         fig = draw_gear_train(solution=False)
+    elif diagram == "random_two_link":
+        fig = draw_random_two_link(problem, stage="question")
     else:
         fig, _ = plt.subplots()
     st.pyplot(fig, clear_figure=True, width="stretch")
@@ -1598,6 +2102,8 @@ def _solution_mechanism_figure(problem):
         return draw_belt_velocity(accel=True, solution=True)
     if diagram == "gear_train":
         return draw_gear_train(solution=True)
+    if diagram == "random_two_link":
+        return draw_random_two_link(problem, stage="velocity")
     fig, _ = plt.subplots()
     return fig
 
@@ -1609,6 +2115,26 @@ def render_solution_diagrams(problem):
         "These diagrams intentionally appear only in the Solution tab. "
         "Each figure uses a transparent canvas and a separate plotting area so vectors do not hide the mechanism."
     )
+    if problem["diagram"] == "random_two_link":
+        st.markdown("**Velocity analysis**")
+        left, right = st.columns(2, gap="large")
+        with left:
+            st.caption("Mechanism with absolute and relative velocity vectors")
+            st.pyplot(draw_random_two_link(problem, stage="velocity"), clear_figure=True, width="stretch")
+        with right:
+            st.caption("Head-to-tail velocity closure using the calculated values")
+            st.pyplot(draw_random_vector_polygon(problem, "velocity"), clear_figure=True, width="stretch")
+        st.markdown("**Acceleration analysis**")
+        left, right = st.columns(2, gap="large")
+        with left:
+            st.caption("Mechanism with tangential, normal, and absolute acceleration vectors")
+            st.pyplot(draw_random_two_link(problem, stage="acceleration"), clear_figure=True, width="stretch")
+        with right:
+            st.caption("Head-to-tail acceleration closure using the calculated values")
+            st.pyplot(draw_random_vector_polygon(problem, "acceleration"), clear_figure=True, width="stretch")
+        st.markdown(vector_legend_html(problem["topic"]), unsafe_allow_html=True)
+        return
+
     component = draw_component_diagram(problem["id"])
     if component is None:
         st.pyplot(_solution_mechanism_figure(problem), clear_figure=True, width="stretch")
@@ -1634,6 +2160,55 @@ def render_learn_tab(topic):
         """,
         unsafe_allow_html=True,
     )
+
+    if topic == "Combined velocity and acceleration":
+        left, right = st.columns(2, gap="large")
+        with left:
+            st.markdown("### Randomized two-link method")
+            st.markdown(
+                r"""
+                1. Adopt **+x right, +y up, and counterclockwise positive**.  
+                2. Use fixed-axis rotation of AB to find \(\mathbf v_B\) and \(\mathbf a_B\).  
+                3. Represent the slider quantities as \(\mathbf v_C=s_C\mathbf d_C\) and \(\mathbf a_C=\ddot s_C\mathbf d_C\).  
+                4. Apply relative velocity to BC and solve the two component equations for \(s_C\) and \(\omega_{BC}\).  
+                5. Use that \(\omega_{BC}\) in the relative-acceleration equation, including both tangential and normal terms.  
+                6. Check that the velocity and acceleration vector polygons close.
+                """
+            )
+            st.markdown("### Vector equations")
+            st.latex(r"\mathbf v_B=\boldsymbol\omega_{AB}\times\mathbf r_{B/A}")
+            st.latex(r"\mathbf v_C=\mathbf v_B+\boldsymbol\omega_{BC}\times\mathbf r_{C/B}")
+            st.latex(r"\mathbf a_B=\boldsymbol\alpha_{AB}\times\mathbf r_{B/A}-\omega_{AB}^{2}\mathbf r_{B/A}")
+            st.latex(r"\mathbf a_C=\mathbf a_B+\boldsymbol\alpha_{BC}\times\mathbf r_{C/B}-\omega_{BC}^{2}\mathbf r_{C/B}")
+        with right:
+            st.markdown("### Sign and direction reminders")
+            st.markdown(
+                r"""
+                - \(\mathbf v_B\) is perpendicular to AB.  
+                - \(\mathbf v_{C/B}\) is perpendicular to BC.  
+                - \(\mathbf a^t_{C/B}\) is perpendicular to BC.  
+                - \(\mathbf a^n_{C/B}\) points from C toward B.  
+                - Both \(\mathbf v_C\) and \(\mathbf a_C\) lie along the fixed straight guide.  
+                - A negative \(\omega\) or \(\alpha\) means clockwise. A negative slider scalar means opposite the displayed positive guide arrow.
+                """
+            )
+            st.markdown(
+                """
+                <div class="warning">
+                <b>Do velocity first.</b><br>
+                The normal acceleration of C relative to B contains the calculated
+                value of omega_BC squared. Skipping the velocity analysis makes the
+                acceleration calculation incomplete.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown("### Reproducibility")
+            st.markdown(
+                "Every question displays its attempt seed. Entering the same seed reproduces "
+                "the same AB angle, BC angle, guide direction, calculations, and diagrams."
+            )
+        return
 
     if topic == "Velocity analysis":
         col1, col2 = st.columns(2, gap="large")
@@ -1953,7 +2528,13 @@ def render_solution_tab(problem, mode):
             return
 
     st.markdown("### Recommended method")
-    if problem["topic"] == "Velocity analysis":
+    if problem["topic"] == "Combined velocity and acceleration":
+        st.markdown(
+            "Use fixed-axis rotation for AB, enforce the straight-guide constraint at C, "
+            "solve relative velocity for BC, and then use that angular velocity in the full "
+            "relative-acceleration equation."
+        )
+    elif problem["topic"] == "Velocity analysis":
         st.markdown("Classify the motion, mark the velocity directions, choose the compatibility relation, and solve the components.")
     else:
         st.markdown("Complete velocity analysis first, then add the tangential and normal acceleration components.")
@@ -1975,8 +2556,14 @@ def render_solution_tab(problem, mode):
             st.latex(line)
 
     st.markdown("### Calculation line-by-line")
-    for line in problem["solution_lines"]:
-        st.latex(line)
+    if problem.get("solution_groups"):
+        for group_title, lines in problem["solution_groups"]:
+            st.markdown("#### " + group_title)
+            for line in lines:
+                st.latex(line)
+    else:
+        for line in problem["solution_lines"]:
+            st.latex(line)
 
     st.markdown("### Teaching point")
     st.markdown(f"<div class='hint'>{problem['teaching_point']}</div>", unsafe_allow_html=True)
@@ -1991,15 +2578,47 @@ def sidebar_controls():
     )
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("## Practice setup")
-    topic = st.sidebar.radio(
-        "Topic",
-        ["Velocity analysis", "Acceleration analysis"],
+    st.sidebar.markdown("## Activity")
+    activity = st.sidebar.selectbox(
+        "Choose activity type",
+        ["Guided problem bank", "Randomized AB-BC mechanism"],
+        help="The randomized activity combines relative velocity and acceleration in one reproducible attempt.",
     )
-    levels = sorted([p["level"] for p in PROBLEMS if p["topic"] == topic])
-    level = st.sidebar.selectbox("Level", levels)
-    names = {p["level"]: p["title"] for p in PROBLEMS if p["topic"] == topic}
-    st.sidebar.caption(f"Problem: {names[level]}")
+
+    if activity == "Guided problem bank":
+        st.sidebar.markdown("### Practice setup")
+        topic = st.sidebar.radio(
+            "Topic",
+            ["Velocity analysis", "Acceleration analysis"],
+        )
+        levels = sorted([p["level"] for p in PROBLEMS if p["topic"] == topic])
+        level = st.sidebar.selectbox("Level", levels)
+        names = {p["level"]: p["title"] for p in PROBLEMS if p["topic"] == topic}
+        st.sidebar.caption(f"Problem: {names[level]}")
+        problem = get_problem(topic, level)
+    else:
+        st.sidebar.markdown("### Randomized attempt")
+        if "random_ab_bc_seed" not in st.session_state:
+            st.session_state["random_ab_bc_seed"] = 20261121
+        if st.sidebar.button("Generate another combination", key="new_random_ab_bc"):
+            current = int(st.session_state["random_ab_bc_seed"])
+            st.session_state["random_ab_bc_seed"] = (1664525 * current + 1013904223) % 900000000 + 1
+        seed = st.sidebar.number_input(
+            "Attempt seed",
+            min_value=1,
+            max_value=999999999,
+            step=1,
+            key="random_ab_bc_seed",
+            help="The same seed always reproduces the same three randomized angles and solution.",
+        )
+        problem = make_random_two_link_problem(int(seed))
+        data = problem["kinematics"]
+        st.sidebar.caption(
+            f"AB angle: {data['theta_ab']:.0f}\u00b0 | "
+            f"BC angle: {data['theta_bc_down']:.0f}\u00b0 below -x | "
+            f"C guide: {data['guide_down']:.0f}\u00b0 below -x"
+        )
+        st.sidebar.caption("Problem: " + problem["title"])
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("## Progress")
@@ -2014,12 +2633,12 @@ def sidebar_controls():
     )
     st.sidebar.caption("Build: " + APP_BUILD_ID)
 
-    return mode, topic, level
+    return mode, problem
 
 
 render_header()
-mode, topic, level = sidebar_controls()
-problem = get_problem(topic, level)
+mode, problem = sidebar_controls()
+topic = problem["topic"]
 
 tab_learn, tab_problem, tab_dir, tab_eq, tab_solve, tab_solution = st.tabs(
     [
