@@ -80,7 +80,13 @@ def load_logo_b64():
 
 
 LOGO_B64 = load_logo_b64()
-APP_BUILD_ID = "encoding-proof-math-rendering-random-ab-bc-2026-11-21-r5"
+APP_BUILD_ID = "science-and-diagram-review-2026-11-21-r6"
+
+# Mechanics references checked during the scientific review:
+# https://mechref.engr.illinois.edu/dyn/rkg.html
+# https://mechanicsmap.psu.edu/websites/12_rigid_body_kinematics/12-3_belt_and_gear_driven_systems/belt_and_gear_driven_systems.html
+# All examples assume planar rigid links, ideal pins, fixed straight slider
+# guides, fixed pulley/gear centres, and inextensible belts without slip.
 
 COLORS = {
     "known": "#2563eb",      # blue
@@ -287,19 +293,19 @@ def render_header():
 
 _MATH_TOKEN_PATTERNS = (
     # Longest and most specific expressions first.
-    ("v_B = v_A + \u03c9 \u00d7 r_B/A", r"\mathbf v_B=\mathbf v_A+\boldsymbol\omega\times\mathbf r_{B/A}"),
+    ("v_B = v_A + \u03c9 \u00d7 r_B/A", r"\mathbf{v}_B=\mathbf{v}_A+\boldsymbol\omega\times\mathbf{r}_{B/A}"),
     ("\u03c9_A r_A = \u03c9_B r_B", r"\omega_A r_A=\omega_B r_B"),
     ("\u03c9_1 r_1 = \u03c9_2 r_2", r"\omega_1 r_1=\omega_2 r_2"),
     ("\u03c9_1 N_1 = \u03c9_2 N_2", r"\omega_1 N_1=\omega_2 N_2"),
     ("a_t = \u03b1r and a_n = \u03c9\u00b2r", r"a_t=\alpha r\quad\text{and}\quad a_n=\omega^2r"),
-    (r"-omega_BC squared times r_C/B", r"-\omega_{BC}^{2}\mathbf r_{C/B}"),
-    ("a_n(C/B)", r"\mathbf a^{n}_{C/B}"),
-    (r"v_B/A", r"\mathbf v_{B/A}"),
-    (r"v_C/B", r"\mathbf v_{C/B}"),
-    (r"a_B/A", r"\mathbf a_{B/A}"),
-    (r"a_C/B", r"\mathbf a_{C/B}"),
-    (r"r_B/A", r"\mathbf r_{B/A}"),
-    (r"r_C/B", r"\mathbf r_{C/B}"),
+    (r"-omega_BC squared times r_C/B", r"-\omega_{BC}^{2}\mathbf{r}_{C/B}"),
+    ("a_n(C/B)", r"\mathbf{a}^{n}_{C/B}"),
+    (r"v_B/A", r"\mathbf{v}_{B/A}"),
+    (r"v_C/B", r"\mathbf{v}_{C/B}"),
+    (r"a_B/A", r"\mathbf{a}_{B/A}"),
+    (r"a_C/B", r"\mathbf{a}_{C/B}"),
+    (r"r_B/A", r"\mathbf{r}_{B/A}"),
+    (r"r_C/B", r"\mathbf{r}_{C/B}"),
     ("\u03c9r", r"\omega r"),
     ("\u03b1r", r"\alpha r"),
     ("\u03c9\u00b2r", r"\omega^{2}r"),
@@ -324,14 +330,14 @@ _MATH_TOKEN_PATTERNS = (
     ("\u03c9_D", r"\omega_D"),
     ("\u03b1_A", r"\alpha_A"),
     ("\u03b1_B", r"\alpha_B"),
-    (r"v_B", r"\mathbf v_B"),
-    (r"v_C", r"\mathbf v_C"),
-    (r"v_A", r"\mathbf v_A"),
-    (r"v_P", r"\mathbf v_P"),
-    (r"a_B", r"\mathbf a_B"),
-    (r"a_C", r"\mathbf a_C"),
-    (r"a_A", r"\mathbf a_A"),
-    (r"a_P", r"\mathbf a_P"),
+    (r"v_B", r"\mathbf{v}_B"),
+    (r"v_C", r"\mathbf{v}_C"),
+    (r"v_A", r"\mathbf{v}_A"),
+    (r"v_P", r"\mathbf{v}_P"),
+    (r"a_B", r"\mathbf{a}_B"),
+    (r"a_C", r"\mathbf{a}_C"),
+    (r"a_A", r"\mathbf{a}_A"),
+    (r"a_P", r"\mathbf{a}_P"),
     (r"a_t", r"a_t"),
     (r"a_n", r"a_n"),
     (r"s_C", r"s_C"),
@@ -393,14 +399,11 @@ def _replace_math_tokens(text):
             latex = original.replace("\u03c9", r"\omega").replace("\u03b1", r"\alpha").replace("\u03b8", r"\theta")
             latex = latex.replace("\u00b2", "^{2}").replace("\u00b0", "^{\\circ}")
             latex = re.sub(r"(\\(?:omega|alpha|theta)|[rNvasa])_([A-Za-z0-9/]+)", r"\1_{\2}", latex)
-            latex = re.sub(
-                r"(?<![A-Za-z])([va])_\{([A-Z](?:/[A-Z])?)\}",
-                lambda match: r"\mathbf{" + match.group(1) + "}_{" + match.group(2) + "}",
-                latex,
-            )
+            # A numeric given such as v_A = 2 m/s is a scalar speed/component.
+            # Vector equations are formatted separately below.
             latex = re.sub(
                 r"(?<![A-Za-z])r_\{([A-Z]/[A-Z])\}",
-                lambda match: r"\mathbf r_{" + match.group(1) + "}",
+                lambda match: r"\mathbf{r}_{" + match.group(1) + "}",
                 latex,
             )
             latex = re.sub(
@@ -456,6 +459,11 @@ def equation_markdown(text):
         lambda match: match.group(1) + " ",
         value,
     )
+    value = re.sub(
+        r"(\\(?:omega|alpha))(\_\{[^}]+\})?(?=\s*\\times)",
+        lambda match: r"\boldsymbol{" + match.group(1) + "}" + (match.group(2) or ""),
+        value,
+    )
     return "$" + value + suffix + "$"
 
 
@@ -509,12 +517,12 @@ PROBLEMS = [
                 "q": "Choose the correct speed relationship.",
                 "options": [
                     "v = \u03b1r",
-                    "v = \u03c9r",
+                    "v = |\u03c9|r",
                     "v = \u03c9\u00b2r",
                     "v = r/\u03c9",
                 ],
-                "correct": "v = \u03c9r",
-                "why": "For fixed-axis rotation, the linear speed equals \u03c9r."
+                "correct": "v = |\u03c9|r",
+                "why": r"For fixed-axis rotation, speed is $v=|\omega|r$."
             }
         ],
         "solve_outputs": [
@@ -578,16 +586,16 @@ PROBLEMS = [
         ],
         "solve_outputs": [
             {"label": "Angular velocity \u03c9_AB (CCW positive)", "key": "omegaAB", "value": 8.0, "tol": 0.05, "unit": "rad/s"},
-            {"label": "Velocity of B (upward positive)", "key": "vB", "value": 3.4641, "tol": 0.03, "unit": "m/s"},
+            {"label": "Velocity of B (upward positive)", "key": "vB", "value": 2.0 * math.sqrt(3.0), "tol": 0.03, "unit": "m/s"},
         ],
         "vector_lines": [
-            r"\mathbf r_{B/A}=0.50(\cos30^\circ\,\mathbf i+\sin30^\circ\,\mathbf j)=(0.433\,\mathbf i+0.250\,\mathbf j)\ \text{m}",
-            r"\omega_{AB}\mathbf k\times\mathbf r_{B/A}=\omega_{AB}\mathbf k\times(0.433\mathbf i+0.250\mathbf j)=(-0.250\omega_{AB})\mathbf i+(0.433\omega_{AB})\mathbf j",
+            r"\mathbf{r}_{B/A}=0.50(\cos30^\circ\,\mathbf{i}+\sin30^\circ\,\mathbf{j})=(0.433\,\mathbf{i}+0.250\,\mathbf{j})\ \text{m}",
+            r"\omega_{AB}\mathbf{k}\times\mathbf{r}_{B/A}=\omega_{AB}\mathbf{k}\times(0.433\mathbf{i}+0.250\mathbf{j})=(-0.250\omega_{AB})\mathbf{i}+(0.433\omega_{AB})\mathbf{j}",
         ],
         "solution_lines": [
-            r"\mathbf r_{B/A}=0.50(\cos30^\circ\,\mathbf i+\sin30^\circ\,\mathbf j)=(0.433\,\mathbf i+0.250\,\mathbf j)\ \text{m}",
-            r"\mathbf v_B=\mathbf v_A+\omega_{AB}\mathbf k\times\mathbf r_{B/A}",
-            r"\mathbf v_B=(2\,\mathbf i)+( -0.25\omega_{AB}\,\mathbf i+0.433\omega_{AB}\,\mathbf j )",
+            r"\mathbf{r}_{B/A}=0.50(\cos30^\circ\,\mathbf{i}+\sin30^\circ\,\mathbf{j})=(0.433\,\mathbf{i}+0.250\,\mathbf{j})\ \text{m}",
+            r"\mathbf{v}_B=\mathbf{v}_A+\omega_{AB}\mathbf{k}\times\mathbf{r}_{B/A}",
+            r"\mathbf{v}_B=(2\,\mathbf{i})+( -0.25\omega_{AB}\,\mathbf{i}+0.433\omega_{AB}\,\mathbf{j} )",
             r"v_{Bx}=0\Rightarrow 2-0.25\omega_{AB}=0 \Rightarrow \omega_{AB}=8.00\ \text{rad/s}",
             r"v_{By}=0.433(8.00)=3.46\ \text{m/s upward}",
         ],
@@ -613,7 +621,7 @@ PROBLEMS = [
                     "Horizontal",
                     "Vertical",
                     "Along AB",
-                    "Along BC",
+                    "Down the 45\u00b0 groove",
                 ],
                 "correct": "Vertical",
                 "why": "B moves perpendicular to AB, and AB is horizontal."
@@ -624,7 +632,7 @@ PROBLEMS = [
                     "Along BC",
                     "Perpendicular to BC",
                     "Along the 45\u00b0 groove",
-                    "Horizontal only",
+                    "Zero relative velocity at every instant",
                 ],
                 "correct": "Perpendicular to BC",
                 "why": "Relative velocity due to rotation is perpendicular to the link."
@@ -644,21 +652,21 @@ PROBLEMS = [
             }
         ],
         "solve_outputs": [
-            {"label": "Angular velocity \u03c9_AB (CCW positive)", "key": "omegaAB", "value": -2.8284, "tol": 0.03, "unit": "rad/s"},
-            {"label": "Angular velocity \u03c9_BC (CCW positive)", "key": "omegaBC", "value": 2.8284, "tol": 0.03, "unit": "rad/s"},
+            {"label": "Angular velocity \u03c9_AB (CCW positive)", "key": "omegaAB", "value": -2.0 * math.sqrt(2.0), "tol": 0.03, "unit": "rad/s"},
+            {"label": "Angular velocity \u03c9_BC (CCW positive)", "key": "omegaBC", "value": 2.0 * math.sqrt(2.0), "tol": 0.03, "unit": "rad/s"},
         ],
         "vector_lines": [
-            r"\mathbf v_C=8(\cos45^\circ\,\mathbf i-\sin45^\circ\,\mathbf j)=(5.657\,\mathbf i-5.657\,\mathbf j)\ \text{m/s}",
-            r"\mathbf r_{C/B}=-2\mathbf j\ \text{m},\qquad \omega_{BC}\mathbf k\times\mathbf r_{C/B}=2\omega_{BC}\mathbf i",
+            r"\mathbf{v}_C=8(\cos45^\circ\,\mathbf{i}-\sin45^\circ\,\mathbf{j})=(5.657\,\mathbf{i}-5.657\,\mathbf{j})\ \text{m/s}",
+            r"\mathbf{r}_{C/B}=-2\mathbf{j}\ \text{m},\qquad \omega_{BC}\mathbf{k}\times\mathbf{r}_{C/B}=2\omega_{BC}\mathbf{i}",
         ],
         "solution_lines": [
-            r"\mathbf v_C=8(\cos45^\circ\,\mathbf i-\sin45^\circ\,\mathbf j)=(5.657\,\mathbf i-5.657\,\mathbf j)\ \text{m/s}",
-            r"\mathbf v_B=v_B\,\mathbf j",
-            r"\mathbf r_{C/B}=(0\,\mathbf i-2\,\mathbf j)\ \text{m}",
-            r"\mathbf v_C=\mathbf v_B+\omega_{BC}\mathbf k\times\mathbf r_{C/B}=\mathbf v_B+(2\omega_{BC}\,\mathbf i)",
+            r"\mathbf{v}_C=8(\cos45^\circ\,\mathbf{i}-\sin45^\circ\,\mathbf{j})=(5.657\,\mathbf{i}-5.657\,\mathbf{j})\ \text{m/s}",
+            r"\mathbf{v}_B=v_B\,\mathbf{j}",
+            r"\mathbf{r}_{C/B}=(0\,\mathbf{i}-2\,\mathbf{j})\ \text{m}",
+            r"\mathbf{v}_C=\mathbf{v}_B+\omega_{BC}\mathbf{k}\times\mathbf{r}_{C/B}=\mathbf{v}_B+(2\omega_{BC}\,\mathbf{i})",
             r"i:\ 5.657=2\omega_{BC}\Rightarrow \omega_{BC}=2.828\ \text{rad/s}",
             r"j:\ -5.657=v_B",
-            r"Since v_B=2\omega_{AB}\text{ downward, }\omega_{AB}=-2.828\ \text{rad/s}",
+            r"v_{By}=2\omega_{AB}=-5.657\Rightarrow\omega_{AB}=-2.828\ \text{rad/s (clockwise)}",
         ],
         "teaching_point": "At a shared pin, the point has one physical velocity, but each link may have a different angular velocity.",
     },
@@ -670,12 +678,14 @@ PROBLEMS = [
         "difficulty": "Moderate",
         "diagram": "ic_velocity",
         "description": (
-            "Bar AB has angular velocity \u03c9_AB = 6 rad/s counterclockwise and length AB = 0.200 m. "
-            "Link BC has length 0.500 m, and point C is a horizontal slider. Determine the angular "
+            "Bar AB is pinned at fixed A, has length 0.200 m, and is at 45\u00b0 above +x. "
+            "Its angular velocity is \u03c9_AB = 6 rad/s counterclockwise. "
+            "Link BC has length 0.500 m and extends from B at 30\u00b0 below +x. "
+            "Point C is a horizontal slider. Determine the angular "
             "velocity of link BC and the velocity of slider C. Report positive angular velocity as CCW "
             "and positive slider velocity to the right."
         ),
-        "givens": ["AB = 0.200 m", "BC = 0.500 m", "\u03c9_AB = 6 rad/s CCW", "C is a horizontal slider"],
+        "givens": ["A is fixed", "AB = 0.200 m at 45\u00b0 above +x", "BC = 0.500 m at 30\u00b0 below +x", "\u03c9_AB = 6 rad/s CCW", "C is a horizontal slider"],
         "direction_questions": [
             {
                 "q": "Which method is most efficient when two velocity directions are known?",
@@ -705,30 +715,34 @@ PROBLEMS = [
                 "q": "Choose the correct scalar relationship once the IC is known.",
                 "options": [
                     "v = \u03b1r",
-                    "v = \u03c9r",
+                    "v = |\u03c9|r",
                     "v = \u03c9\u00b2r",
                     "v = r/\u03c9",
                 ],
-                "correct": "v = \u03c9r",
-                "why": "At that instant the rigid body behaves like rotation about the IC."
+                "correct": "v = |\u03c9|r",
+                "why": r"At that instant, speed is $v=|\omega|r$ about the finite IC; determine the sense separately."
             }
         ],
         "solve_outputs": [
-            {"label": "Angular velocity magnitude of link BC", "key": "omegaBCmag", "value": 1.9596, "tol": 0.03, "unit": "rad/s"},
-            {"label": "Velocity magnitude of slider C", "key": "vCmag", "value": 1.3384, "tol": 0.03, "unit": "m/s"},
+            {"label": "Angular velocity of BC (CCW positive)", "key": "omegaBC", "value": -1.9595917942265424, "tol": 0.03, "unit": "rad/s"},
+            {"label": "Velocity of C (rightward positive)", "key": "vC", "value": -1.3384260859804926, "tol": 0.03, "unit": "m/s"},
         ],
         "vector_lines": [
-            r"\mathbf r_{B/A}=0.200(\cos45^\circ\,\mathbf i+\sin45^\circ\,\mathbf j)=(0.1414\,\mathbf i+0.1414\,\mathbf j)\ \text{m}",
-            r"\mathbf v_B=\omega_{AB}\mathbf k\times\mathbf r_{B/A}=6\mathbf k\times(0.1414\mathbf i+0.1414\mathbf j)=(-0.8485\,\mathbf i+0.8485\,\mathbf j)\ \text{m/s}",
-            r"\mathbf r_{C/B}=0.500(\cos(-30^\circ)\,\mathbf i+\sin(-30^\circ)\,\mathbf j)=(0.433\,\mathbf i-0.250\,\mathbf j)\ \text{m}",
-            r"\omega_{BC}\mathbf k\times\mathbf r_{C/B}=(0.250\omega_{BC})\mathbf i+(0.433\omega_{BC})\mathbf j",
-            r"\mathbf v_C=u\mathbf i\qquad (\text{slider C has no }j\text{-component})",
+            r"\mathbf{r}_{B/A}=0.200(\cos45^\circ\,\mathbf{i}+\sin45^\circ\,\mathbf{j})=(0.1414\,\mathbf{i}+0.1414\,\mathbf{j})\ \text{m}",
+            r"\mathbf{v}_B=\omega_{AB}\mathbf{k}\times\mathbf{r}_{B/A}=6\mathbf{k}\times(0.1414\mathbf{i}+0.1414\mathbf{j})=(-0.8485\,\mathbf{i}+0.8485\,\mathbf{j})\ \text{m/s}",
+            r"\mathbf{r}_{C/B}=0.500(\cos(-30^\circ)\,\mathbf{i}+\sin(-30^\circ)\,\mathbf{j})=(0.433\,\mathbf{i}-0.250\,\mathbf{j})\ \text{m}",
+            r"\omega_{BC}\mathbf{k}\times\mathbf{r}_{C/B}=(0.250\omega_{BC})\mathbf{i}+(0.433\omega_{BC})\mathbf{j}",
+            r"\mathbf{v}_C=u\mathbf{i}\qquad (\text{slider C has no }j\text{-component})",
         ],
         "solution_lines": [
             r"v_B=\omega_{AB}AB=(6)(0.200)=1.20\ \text{m/s}",
-            r"\mathbf v_B \text{ is perpendicular to }AB,\quad \mathbf v_C\text{ is horizontal}",
-            r"\text{Locate the IC by drawing lines perpendicular to }\mathbf v_B\text{ and }\mathbf v_C",
-            r"\mathbf v_C=\mathbf v_B+\omega_{BC}\mathbf k\times\mathbf r_{C/B}",
+            r"\mathbf{v}_B \text{ is perpendicular to }AB,\quad \mathbf{v}_C\text{ is horizontal}",
+            r"\text{Locate the IC by drawing lines perpendicular to }\mathbf{v}_B\text{ and }\mathbf{v}_C",
+            r"r_{B/IC}=\sqrt{2}(0.500\cos30^\circ)=0.61237\ \mathrm{m}",
+            r"r_{C/IC}=0.500\cos30^\circ+0.500\sin30^\circ=0.68301\ \mathrm{m}",
+            r"|\omega_{BC}|=\frac{1.20}{0.61237}=1.95959\ \mathrm{rad/s}\quad\text{(clockwise)}",
+            r"|v_C|=|\omega_{BC}|r_{C/IC}=1.33843\ \mathrm{m/s}\quad\text{(leftward)}",
+            r"\mathbf{v}_C=\mathbf{v}_B+\omega_{BC}\mathbf{k}\times\mathbf{r}_{C/B}",
             r"Using components gives \omega_{BC}=-1.960\ \text{rad/s (clockwise)}",
             r"v_C=-1.338\ \text{m/s (to the left)}",
         ],
@@ -742,10 +756,11 @@ PROBLEMS = [
         "difficulty": "Easy",
         "diagram": "belt_velocity",
         "description": (
-            "Two pulleys are connected by an open belt with no slip. Pulley A has radius 0.200 m and "
-            "rotates at \u03c9_A = 12 rad/s. Pulley B has radius 0.125 m. Determine the angular velocity of B."
+            "Two fixed-centre pulleys are connected by an inextensible open belt with no slip. "
+            "Pulley A has radius 0.200 m and rotates at \u03c9_A = 12 rad/s counterclockwise. "
+            "Pulley B has radius 0.125 m. Determine the angular velocity of B (CCW positive)."
         ),
-        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "\u03c9_A = 12 rad/s", "Open belt, no slip"],
+        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "\u03c9_A = 12 rad/s CCW", "Fixed centres; inextensible open belt, no slip"],
         "direction_questions": [
             {
                 "q": "For an open belt, pulley B rotates:",
@@ -832,24 +847,25 @@ PROBLEMS = [
         ],
         "equation_questions": [
             {
-                "q": "Choose the correct gear-speed relationship for one external mesh.",
+                "q": "Choose the signed gear-speed relationship for one external mesh (CCW positive).",
                 "options": [
-                    "\u03c9_1 N_1 = \u03c9_2 N_2",
+                    "\u03c9_1 N_1 = -\u03c9_2 N_2",
                     "\u03c9_1 / N_1 = \u03c9_2 / N_2",
                     "\u03c9_1 N_2 = \u03c9_2 / N_1",
                     "\u03c9_1 = \u03c9_2 always",
                 ],
-                "correct": "\u03c9_1 N_1 = \u03c9_2 N_2",
-                "why": "Equal tangential speeds at meshing pitch circles give \u03c9_1 r_1 = \u03c9_2 r_2. With proportional tooth counts, \u03c9_1 N_1 = \u03c9_2 N_2."
+                "correct": "\u03c9_1 N_1 = -\u03c9_2 N_2",
+                "why": r"With CCW positive, $\omega_1N_1=-\omega_2N_2$. The equal positive products apply to speed magnitudes."
             }
         ],
         "solve_outputs": [
             {"label": "Angular velocity magnitude of gear D", "key": "omegaD", "value": 2.0, "tol": 0.02, "unit": "rad/s"},
         ],
         "solution_lines": [
-            r"\omega_B=\omega_A\frac{N_A}{N_B}=18\frac{20}{60}=6\ \text{rad/s}",
+            r"\text{Use CCW positive: }\omega_A=-18\ \mathrm{rad/s}",
+            r"\omega_B=-\omega_A\frac{N_A}{N_B}=-(-18)\frac{20}{60}=+6\ \text{rad/s}",
             r"\omega_C=\omega_B=6\ \text{rad/s}",
-            r"\omega_D=\omega_C\frac{N_C}{N_D}=6\frac{30}{90}=2\ \text{rad/s}",
+            r"\omega_D=-\omega_C\frac{N_C}{N_D}=-6\frac{30}{90}=-2\ \text{rad/s},\quad |\omega_D|=2\ \mathrm{rad/s}",
             r"\text{A is clockwise, B is counterclockwise, C is counterclockwise, so D is clockwise.}",
         ],
         "teaching_point": "Track the direction carefully: each external mesh reverses the direction, while a same-shaft pair keeps the direction.",
@@ -862,11 +878,11 @@ PROBLEMS = [
         "difficulty": "Foundation",
         "diagram": "fixed_acceleration",
         "description": (
-            "A disk rotates about a fixed axis. At point P on the rim, r = 0.30 m, \u03c9 = 6 rad/s and "
-            "\u03b1 = 4 rad/s\u00b2 at the instant shown. Determine the tangential acceleration, normal acceleration, "
+            "A disk rotates about a fixed axis. At point P on the rim, r = 0.30 m, \u03c9 = 6 rad/s CCW and "
+            "\u03b1 = 4 rad/s\u00b2 CCW at the instant shown. Determine the magnitudes of the tangential acceleration, normal acceleration, "
             "and resultant acceleration of point P."
         ),
-        "givens": ["r = 0.30 m", "\u03c9 = 6 rad/s", "\u03b1 = 4 rad/s\u00b2"],
+        "givens": ["r = 0.30 m", "\u03c9 = 6 rad/s CCW", "\u03b1 = 4 rad/s\u00b2 CCW"],
         "direction_questions": [
             {
                 "q": "Tangential acceleration acts:",
@@ -907,7 +923,7 @@ PROBLEMS = [
         "solve_outputs": [
             {"label": "Tangential acceleration a_t", "key": "at", "value": 1.2, "tol": 0.02, "unit": "m/s\u00b2"},
             {"label": "Normal acceleration a_n", "key": "an", "value": 10.8, "tol": 0.03, "unit": "m/s\u00b2"},
-            {"label": "Resultant acceleration |a|", "key": "ares", "value": 10.8665, "tol": 0.03, "unit": "m/s\u00b2"},
+            {"label": "Resultant acceleration |a|", "key": "ares", "value": math.hypot(1.2, 10.8), "tol": 0.03, "unit": "m/s\u00b2"},
         ],
         "solution_lines": [
             r"a_t=\alpha r=(4)(0.30)=1.20\ \text{m/s}^2",
@@ -968,19 +984,19 @@ PROBLEMS = [
             }
         ],
         "solve_outputs": [
-            {"label": "Angular acceleration \u03b1_AB (CCW positive)", "key": "alphaAB", "value": -27.7128, "tol": 0.05, "unit": "rad/s\u00b2"},
+            {"label": "Angular acceleration \u03b1_AB (CCW positive)", "key": "alphaAB", "value": -16.0 * math.sqrt(3.0), "tol": 0.05, "unit": "rad/s\u00b2"},
             {"label": "Acceleration of B (upward positive)", "key": "aB", "value": -16.0, "tol": 0.05, "unit": "m/s\u00b2"},
         ],
         "vector_lines": [
-            r"\mathbf r_{B/A}=0.50(\cos30^\circ\,\mathbf i+\sin30^\circ\,\mathbf j)=(0.433\,\mathbf i+0.250\,\mathbf j)\ \text{m}",
-            r"\alpha_{AB}\mathbf k\times\mathbf r_{B/A}=(-0.250\alpha_{AB})\mathbf i+(0.433\alpha_{AB})\mathbf j",
-            r"-\omega_{AB}^2\mathbf r_{B/A}=-16(0.433\mathbf i+0.250\mathbf j)=(-6.928\mathbf i-4.000\mathbf j)",
+            r"\mathbf{r}_{B/A}=0.50(\cos30^\circ\,\mathbf{i}+\sin30^\circ\,\mathbf{j})=(0.433\,\mathbf{i}+0.250\,\mathbf{j})\ \text{m}",
+            r"\alpha_{AB}\mathbf{k}\times\mathbf{r}_{B/A}=(-0.250\alpha_{AB})\mathbf{i}+(0.433\alpha_{AB})\mathbf{j}",
+            r"-\omega_{AB}^2\mathbf{r}_{B/A}=-16(0.433\mathbf{i}+0.250\mathbf{j})=(-6.928\mathbf{i}-4.000\mathbf{j})",
         ],
         "solution_lines": [
             r"\text{From the velocity step: }\omega_{AB}=4.00\ \text{rad/s}",
-            r"\mathbf r_{B/A}=(0.433\,\mathbf i+0.250\,\mathbf j)\ \text{m}",
-            r"\mathbf a_B=\mathbf 0+\alpha_{AB}\mathbf k\times\mathbf r_{B/A}-\omega_{AB}^2\mathbf r_{B/A}",
-            r"\mathbf a_B=(-0.25\alpha_{AB}-6.928)\mathbf i+(0.433\alpha_{AB}-4.000)\mathbf j",
+            r"\mathbf{r}_{B/A}=(0.433\,\mathbf{i}+0.250\,\mathbf{j})\ \text{m}",
+            r"\mathbf{a}_B=\mathbf 0+\alpha_{AB}\mathbf{k}\times\mathbf{r}_{B/A}-\omega_{AB}^2\mathbf{r}_{B/A}",
+            r"\mathbf{a}_B=(-0.25\alpha_{AB}-6.928)\mathbf{i}+(0.433\alpha_{AB}-4.000)\mathbf{j}",
             r"a_{Bx}=0\Rightarrow -0.25\alpha_{AB}-6.928=0 \Rightarrow \alpha_{AB}=-27.713\ \text{rad/s}^2",
             r"a_{By}=0.433(-27.713)-4=-16.0\ \text{m/s}^2",
         ],
@@ -990,19 +1006,19 @@ PROBLEMS = [
         "id": "A3",
         "topic": "Acceleration analysis",
         "level": 3,
-        "title": "Twisted-belt acceleration transfer",
+        "title": "Crossed-belt acceleration transfer",
         "difficulty": "Moderate",
         "diagram": "belt_acceleration",
         "description": (
-            "A twisted belt connects wheel A and pulley B without slip, so the pulleys rotate in opposite directions. "
-            "Wheel A has radius 0.200 m and starts from rest with constant angular acceleration \u03b1_A = 3 rad/s\u00b2. "
-            "Pulley B has radius 0.125 m. Determine \u03c9_B, \u03b1_B, and the tangential and normal acceleration components "
+            "An inextensible crossed belt connects fixed-centre pulleys A and B without slip, so they rotate in opposite directions. "
+            "Pulley A has radius 0.200 m and starts from rest with constant angular acceleration \u03b1_A = 3 rad/s\u00b2 CCW. "
+            "Pulley B has radius 0.125 m. Determine the magnitudes of \u03c9_B, \u03b1_B, and the tangential and normal acceleration components "
             "of a point P on the rim of B at t = 3 s."
         ),
-        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "\u03b1_A = 3 rad/s\u00b2", "\u03c9_A(0)=0", "t = 3 s", "Twisted belt, no slip"],
+        "givens": ["r_A = 0.200 m", "r_B = 0.125 m", "\u03b1_A = 3 rad/s\u00b2 CCW", "\u03c9_A(0)=0", "t = 3 s", "Fixed centres; inextensible crossed belt, no slip"],
         "direction_questions": [
             {
-                "q": "For a twisted belt, pulley B rotates:",
+                "q": "For this crossed belt, pulley B rotates:",
                 "options": [
                     "In the same direction as A",
                     "In the opposite direction to A",
@@ -1010,7 +1026,7 @@ PROBLEMS = [
                     "Only counterclockwise",
                 ],
                 "correct": "In the opposite direction to A",
-                "why": "A twisted/crossed belt reverses the direction of rotation."
+                "why": "A crossed belt on parallel pulley axes reverses the direction of rotation."
             },
             {
                 "q": "Which acceleration component transfers directly through the no-slip belt?",
@@ -1026,15 +1042,15 @@ PROBLEMS = [
         ],
         "equation_questions": [
             {
-                "q": "Choose the correct no-slip tangential-acceleration relation.",
+                "q": "Choose the signed no-slip acceleration relation for this crossed belt (CCW positive).",
                 "options": [
                     "\u03c9_A\u00b2r_A = \u03c9_B\u00b2r_B",
-                    "\u03b1_A r_A = \u03b1_B r_B",
+                    "\u03b1_A r_A = -\u03b1_B r_B",
                     "\u03b1_A = \u03b1_B",
                     "a_nA = a_nB",
                 ],
-                "correct": "\u03b1_A r_A = \u03b1_B r_B",
-                "why": "Tangential acceleration is the transferred quantity in a no-slip belt."
+                "correct": "\u03b1_A r_A = -\u03b1_B r_B",
+                "why": "A crossed belt reverses the signed angular acceleration. The tangential acceleration magnitudes are equal."
             }
         ],
         "solve_outputs": [
@@ -1045,10 +1061,10 @@ PROBLEMS = [
         ],
         "solution_lines": [
             r"\omega_A=\alpha_A t=(3)(3)=9\ \text{rad/s}",
-            r"\omega_A r_A=\omega_B r_B \Rightarrow \omega_B=\frac{9(0.200)}{0.125}=14.4\ \text{rad/s}",
-            r"\alpha_A r_A=\alpha_B r_B \Rightarrow \alpha_B=\frac{3(0.200)}{0.125}=4.8\ \text{rad/s}^2",
-            r"a_t=\alpha_B r_B=(4.8)(0.125)=0.60\ \text{m/s}^2",
-            r"a_n=\omega_B^2 r_B=(14.4^2)(0.125)=25.92\ \text{m/s}^2",
+            r"\text{CCW positive: }\omega_A r_A=-\omega_B r_B\Rightarrow\omega_B=-\frac{9(0.200)}{0.125}=-14.4\ \mathrm{rad/s}\ \text{(CW)}",
+            r"\alpha_A r_A=-\alpha_B r_B\Rightarrow\alpha_B=-\frac{3(0.200)}{0.125}=-4.8\ \mathrm{rad/s^2}\ \text{(CW)}",
+            r"a_t=|\alpha_B|r_B=(4.8)(0.125)=0.60\ \mathrm{m/s^2}",
+            r"a_n=\omega_B^2r_B=(14.4^2)(0.125)=25.92\ \mathrm{m/s^2}",
         ],
         "teaching_point": "No slip transfers tangential speed and tangential acceleration. Normal acceleration is computed separately on each pulley.",
     },
@@ -1060,13 +1076,13 @@ PROBLEMS = [
         "difficulty": "Challenging",
         "diagram": "linked_acceleration",
         "description": (
-            "Link AB is horizontal and link BC is vertical, with lengths AB = 2 m and BC = 2 m. "
+            "A is fixed. Link AB extends horizontally to the right and link BC vertically downward, with lengths AB = 2 m and BC = 2 m. "
             "From the velocity step, slider C is known to move down a 45\u00b0 groove at 8 m/s, giving "
-            "\u03c9_AB = -2.828 rad/s and \u03c9_BC = 2.828 rad/s at this instant. If slider C now has acceleration "
+            "\u03c9_AB = -2.828427 rad/s and \u03c9_BC = 2.828427 rad/s (approximately). If slider C has acceleration "
             "3.0 m/s\u00b2 down the same 45\u00b0 groove, determine the angular accelerations \u03b1_AB and \u03b1_BC. "
             "Use counterclockwise as positive."
         ),
-        "givens": ["AB = 2 m", "BC = 2 m", "\u03c9_AB = -2.828 rad/s", "\u03c9_BC = 2.828 rad/s", "a_C = 3 m/s\u00b2 down 45\u00b0 groove"],
+        "givens": ["A is fixed", "AB = 2 m", "BC = 2 m", "v_C = 8 m/s down-right along the 45\u00b0 groove", r"$\omega_{AB}=-2\sqrt{2}\ \mathrm{rad/s}$", r"$\omega_{BC}=+2\sqrt{2}\ \mathrm{rad/s}$", "a_C = 3 m/s\u00b2 down-right along the same groove"],
         "direction_questions": [
             {
                 "q": "The relative normal acceleration of point C with respect to B on link BC points:",
@@ -1105,22 +1121,22 @@ PROBLEMS = [
             }
         ],
         "solve_outputs": [
-            {"label": "Angular acceleration \u03b1_AB (CCW positive)", "key": "alphaAB", "value": -9.0607, "tol": 0.04, "unit": "rad/s\u00b2"},
-            {"label": "Angular acceleration \u03b1_BC (CCW positive)", "key": "alphaBC", "value": 9.0607, "tol": 0.04, "unit": "rad/s\u00b2"},
+            {"label": "Angular acceleration \u03b1_AB (CCW positive)", "key": "alphaAB", "value": -(8.0 + 3.0 / (2.0 * math.sqrt(2.0))), "tol": 0.04, "unit": "rad/s\u00b2"},
+            {"label": "Angular acceleration \u03b1_BC (CCW positive)", "key": "alphaBC", "value": 8.0 + 3.0 / (2.0 * math.sqrt(2.0)), "tol": 0.04, "unit": "rad/s\u00b2"},
         ],
         "vector_lines": [
-            r"\mathbf a_C=3(\cos45^\circ\,\mathbf i-\sin45^\circ\,\mathbf j)=(2.121\,\mathbf i-2.121\,\mathbf j)\ \text{m/s}^2",
-            r"\mathbf a_B=\alpha_{AB}\mathbf k\times(2\mathbf i)-\omega_{AB}^2(2\mathbf i)=(-16)\mathbf i+(2\alpha_{AB})\mathbf j",
-            r"\mathbf r_{C/B}=-2\mathbf j\ \text{m}",
-            r"\alpha_{BC}\mathbf k\times\mathbf r_{C/B}=2\alpha_{BC}\mathbf i,\qquad -\omega_{BC}^2\mathbf r_{C/B}=+16\mathbf j",
+            r"\mathbf{a}_C=3(\cos45^\circ\,\mathbf{i}-\sin45^\circ\,\mathbf{j})=(2.121\,\mathbf{i}-2.121\,\mathbf{j})\ \text{m/s}^2",
+            r"\mathbf{a}_B=\alpha_{AB}\mathbf{k}\times(2\mathbf{i})-\omega_{AB}^2(2\mathbf{i})=(-16)\mathbf{i}+(2\alpha_{AB})\mathbf{j}",
+            r"\mathbf{r}_{C/B}=-2\mathbf{j}\ \text{m}",
+            r"\alpha_{BC}\mathbf{k}\times\mathbf{r}_{C/B}=2\alpha_{BC}\mathbf{i},\qquad -\omega_{BC}^2\mathbf{r}_{C/B}=+16\mathbf{j}",
         ],
         "solution_lines": [
-            r"\mathbf a_C=3(\cos45^\circ\,\mathbf i-\sin45^\circ\,\mathbf j)=(2.121\,\mathbf i-2.121\,\mathbf j)\ \text{m/s}^2",
-            r"\mathbf a_B=\alpha_{AB}\mathbf k\times(2\mathbf i)-\omega_{AB}^2(2\mathbf i)=(-16)\mathbf i+(2\alpha_{AB})\mathbf j",
-            r"\mathbf r_{C/B}=(0\mathbf i-2\mathbf j)\ \text{m}",
-            r"\alpha_{BC}\mathbf k\times\mathbf r_{C/B}=(2\alpha_{BC})\mathbf i",
-            r"-\omega_{BC}^2\mathbf r_{C/B}=(0\mathbf i+16\mathbf j)",
-            r"\mathbf a_C=\mathbf a_B+(2\alpha_{BC})\mathbf i+16\mathbf j",
+            r"\mathbf{a}_C=3(\cos45^\circ\,\mathbf{i}-\sin45^\circ\,\mathbf{j})=(2.121\,\mathbf{i}-2.121\,\mathbf{j})\ \text{m/s}^2",
+            r"\mathbf{a}_B=\alpha_{AB}\mathbf{k}\times(2\mathbf{i})-\omega_{AB}^2(2\mathbf{i})=(-16)\mathbf{i}+(2\alpha_{AB})\mathbf{j}",
+            r"\mathbf{r}_{C/B}=(0\mathbf{i}-2\mathbf{j})\ \text{m}",
+            r"\alpha_{BC}\mathbf{k}\times\mathbf{r}_{C/B}=(2\alpha_{BC})\mathbf{i}",
+            r"-\omega_{BC}^2\mathbf{r}_{C/B}=(0\mathbf{i}+16\mathbf{j})",
+            r"\mathbf{a}_C=\mathbf{a}_B+(2\alpha_{BC})\mathbf{i}+16\mathbf{j}",
             r"i:\ 2.121=-16+2\alpha_{BC}\Rightarrow \alpha_{BC}=9.061\ \text{rad/s}^2",
             r"j:\ -2.121=2\alpha_{AB}+16\Rightarrow \alpha_{AB}=-9.061\ \text{rad/s}^2",
         ],
@@ -1166,6 +1182,109 @@ def _cross2d(left, right):
 def _unit_from_degrees(angle_deg):
     angle = math.radians(float(angle_deg))
     return _vec2([math.cos(angle), math.sin(angle)], "unit direction")
+
+
+def _perp(vector):
+    """Return k cross vector, using the same CCW convention in every figure."""
+    vector = _vec2(vector)
+    return np.array([-vector[1], vector[0]])
+
+
+def _solve_slider_link(r, v_base, guide, a_base=None):
+    """Solve planar rigid-link motion with one endpoint on a fixed straight guide."""
+    r, v_base, guide = _vec2(r), _vec2(v_base), _vec2(guide)
+    matrix = np.column_stack((guide, -_perp(r)))
+    speed, omega = np.linalg.solve(matrix, v_base)
+    result = {
+        "v": speed * guide, "omega": float(omega),
+        "v_relative": omega * _perp(r),
+    }
+    if a_base is not None:
+        normal = -(omega ** 2) * r
+        acceleration, alpha = np.linalg.solve(matrix, _vec2(a_base) + normal)
+        result.update(a=acceleration * guide, alpha=float(alpha),
+                      a_t=alpha * _perp(r), a_n=normal)
+    return result
+
+
+def solve_guided_problem(problem_id):
+    """Derive the guided targets and plot vectors from their physical givens.
+
+    This calculation does not read the stored answer keys. In particular, the
+    IC example is checked with a separate relative-velocity solution.
+    """
+    if problem_id in ("V1", "A1"):
+        r = 0.30 * _unit_from_degrees(50.0 if problem_id == "V1" else 55.0)
+        v = 6.0 * _perp(r)
+        a_t, a_n = 4.0 * _perp(r), -36.0 * r
+        outputs = ({"vP": float(np.linalg.norm(v))} if problem_id == "V1" else
+                   {"at": float(np.linalg.norm(a_t)), "an": float(np.linalg.norm(a_n)),
+                    "ares": float(np.linalg.norm(a_t + a_n))})
+        return dict(r_op=r, v_p=v, a_t=a_t, a_n=a_n, a_p=a_t + a_n, outputs=outputs)
+
+    if problem_id in ("V2", "A2"):
+        r = 0.50 * _unit_from_degrees(30.0)
+        v_a = np.array([2.0 if problem_id == "V2" else 1.0, 0.0])
+        motion = _solve_slider_link(r, v_a, [0.0, 1.0], [0.0, 0.0])
+        outputs = ({"omegaAB": motion["omega"], "vB": float(motion["v"][1])}
+                   if problem_id == "V2" else
+                   {"alphaAB": motion["alpha"], "aB": float(motion["a"][1])})
+        return dict(r_ba=r, v_a=v_a, v_b=motion["v"], v_ba=motion["v_relative"],
+                    omega_ab=motion["omega"], alpha_ab=motion["alpha"],
+                    a_b=motion["a"], a_ba_t=motion["a_t"], a_ba_n=motion["a_n"],
+                    outputs=outputs)
+
+    if problem_id in ("V3", "A4"):
+        r_ba, r_cb = np.array([2.0, 0.0]), np.array([0.0, -2.0])
+        guide = _unit_from_degrees(-45.0)
+        v_c, a_c = 8.0 * guide, 3.0 * guide
+        matrix = np.column_stack((_perp(r_ba), _perp(r_cb)))
+        omega_ab, omega_bc = np.linalg.solve(matrix, v_c)
+        v_b, v_cb = omega_ab * _perp(r_ba), omega_bc * _perp(r_cb)
+        a_bn, a_cbn = -(omega_ab ** 2) * r_ba, -(omega_bc ** 2) * r_cb
+        alpha_ab, alpha_bc = np.linalg.solve(matrix, a_c - a_bn - a_cbn)
+        a_bt, a_cbt = alpha_ab * _perp(r_ba), alpha_bc * _perp(r_cb)
+        outputs = ({"omegaAB": float(omega_ab), "omegaBC": float(omega_bc)}
+                   if problem_id == "V3" else
+                   {"alphaAB": float(alpha_ab), "alphaBC": float(alpha_bc)})
+        return dict(r_ba=r_ba, r_cb=r_cb, v_b=v_b, v_cb=v_cb, v_c=v_c,
+                    omega_ab=float(omega_ab), omega_bc=float(omega_bc),
+                    alpha_ab=float(alpha_ab), alpha_bc=float(alpha_bc),
+                    a_b=a_bt + a_bn, a_b_t=a_bt, a_b_n=a_bn,
+                    a_cb_t=a_cbt, a_cb_n=a_cbn, a_c=a_c, outputs=outputs)
+
+    if problem_id == "V4":
+        r_ba = 0.200 * _unit_from_degrees(45.0)
+        r_cb = 0.500 * _unit_from_degrees(-30.0)
+        v_b = 6.0 * _perp(r_ba)
+        motion = _solve_slider_link(r_cb, v_b, [1.0, 0.0])
+        ic = r_ba + _perp(v_b) / motion["omega"]
+        return dict(r_ba=r_ba, r_cb=r_cb, v_b=v_b, v_c=motion["v"],
+                    v_cb=motion["v_relative"], omega_bc=motion["omega"], ic=ic,
+                    outputs={"omegaBC": motion["omega"], "vC": float(motion["v"][0])})
+
+    if problem_id in ("V5", "A3"):
+        r_a, r_b = 0.200, 0.125
+        omega_a = 12.0 if problem_id == "V5" else 3.0 * 3.0
+        direction = 1.0 if problem_id == "V5" else -1.0
+        omega_b = direction * omega_a * r_a / r_b
+        alpha_b = direction * 3.0 * r_a / r_b
+        a_t = np.array([-alpha_b * r_b, 0.0])  # P is at the top of B.
+        a_n = np.array([0.0, -(omega_b ** 2) * r_b])
+        outputs = ({"omegaB": omega_b} if problem_id == "V5" else
+                   {"omegaB": abs(omega_b), "alphaB": abs(alpha_b),
+                    "at": float(np.linalg.norm(a_t)), "an": float(np.linalg.norm(a_n))})
+        return dict(omega_a=omega_a, omega_b=omega_b, alpha_b=alpha_b,
+                    a_t=a_t, a_n=a_n, a_p=a_t + a_n, outputs=outputs)
+
+    if problem_id == "V6":
+        omega_a = -18.0
+        omega_b = -omega_a * 20.0 / 60.0
+        omega_c = omega_b
+        omega_d = -omega_c * 30.0 / 90.0
+        return dict(omega_a=omega_a, omega_b=omega_b, omega_c=omega_c,
+                    omega_d=omega_d, outputs={"omegaD": abs(omega_d)})
+    raise ValueError("Unknown guided problem: " + str(problem_id))
 
 
 def _random_combination_valid(theta_ab_deg, theta_bc_down_deg, guide_down_deg):
@@ -1299,14 +1418,15 @@ def make_random_two_link_problem(seed):
                 rf"\mathbf r_{{B/A}}={RANDOM_L_AB:.2f}(\cos {theta_ab}^\circ\,\mathbf i+\sin {theta_ab}^\circ\,\mathbf j)={_vec_latex(rb, 'm')}",
                 rf"\mathbf r_{{C/B}}={RANDOM_L_BC:.2f}(\cos {180 + theta_bc}^\circ\,\mathbf i+\sin {180 + theta_bc}^\circ\,\mathbf j)={_vec_latex(rc, 'm')}",
                 rf"\mathbf d_C=(\cos {180 + guide_angle}^\circ\,\mathbf i+\sin {180 + guide_angle}^\circ\,\mathbf j)=({d[0]:.4f}\mathbf i{d[1]:+.4f}\mathbf j)",
-                rf"\mathbf v_C=s_C\mathbf d_C,\quad \mathbf a_C=\ddot s_C\mathbf d_C,\quad \mathbf d_C\cdot\mathbf e_{{BC}}={den:.4f}\neq0",
+                r"\mathbf{e}_{BC}=\mathbf{r}_{C/B}/L_{BC},\quad\mathbf{n}_{BC}=\mathbf{k}\times\mathbf{e}_{BC}",
+                rf"\mathbf v_C=\dot s_C\mathbf d_C,\quad \mathbf a_C=\ddot s_C\mathbf d_C,\quad \mathbf d_C\cdot\mathbf e_{{BC}}={den:.4f}\neq0",
             ],
         ),
         (
             "2. Member AB: velocity of B",
             [
                 rf"\boldsymbol\omega_{{AB}}={RANDOM_OMEGA_AB:.2f}\mathbf k\ \mathrm{{rad/s}}",
-                r"\mathbf v_B=\mathbf v_A+\boldsymbol\omega_{AB}\times\mathbf r_{B/A},\qquad \mathbf v_A=\mathbf0",
+                r"\mathbf{v}_B=\mathbf{v}_A+\boldsymbol\omega_{AB}\times\mathbf{r}_{B/A},\qquad \mathbf{v}_A=\mathbf0",
                 rf"\mathbf v_B={RANDOM_OMEGA_AB:.2f}\mathbf k\times({_vec_latex(rb, 'm')})={_vec_latex(vb, 'm/s')}",
                 rf"|\mathbf v_B|={np.linalg.norm(vb):.4f}\ \mathrm{{m/s}},\qquad \mathbf v_B\perp AB",
             ],
@@ -1314,11 +1434,11 @@ def make_random_two_link_problem(seed):
         (
             "3. Member BC: relative velocity and x-y equations",
             [
-                r"\mathbf v_C=\mathbf v_B+\boldsymbol\omega_{BC}\times\mathbf r_{C/B}",
-                rf"s_C({d[0]:.4f}\mathbf i{d[1]:+.4f}\mathbf j)=({_vec_latex(vb, 'm/s')})+\omega_{{BC}}\mathbf k\times({_vec_latex(rc, 'm')})",
-                rf"x:\quad {d[0]:.4f}s_C={vb[0]:.4f}{(-rc[1]):+.4f}\omega_{{BC}}",
-                rf"y:\quad {d[1]:.4f}s_C={vb[1]:.4f}{rc[0]:+.4f}\omega_{{BC}}",
-                rf"s_C=\frac{{\mathbf v_B\cdot\mathbf e_{{BC}}}}{{\mathbf d_C\cdot\mathbf e_{{BC}}}}={v_c_signed:.4f}\ \mathrm{{m/s}}",
+                r"\mathbf{v}_C=\mathbf{v}_B+\boldsymbol\omega_{BC}\times\mathbf{r}_{C/B}",
+                rf"\dot s_C({d[0]:.4f}\mathbf i{d[1]:+.4f}\mathbf j)=({_vec_latex(vb, 'm/s')})+\omega_{{BC}}\mathbf k\times({_vec_latex(rc, 'm')})",
+                rf"x:\quad {d[0]:.4f}\dot s_C={vb[0]:.4f}{(-rc[1]):+.4f}\omega_{{BC}}",
+                rf"y:\quad {d[1]:.4f}\dot s_C={vb[1]:.4f}{rc[0]:+.4f}\omega_{{BC}}",
+                rf"\dot s_C=\frac{{\mathbf v_B\cdot\mathbf e_{{BC}}}}{{\mathbf d_C\cdot\mathbf e_{{BC}}}}={v_c_signed:.4f}\ \mathrm{{m/s}}",
                 rf"\omega_{{BC}}=\frac{{(\mathbf v_C-\mathbf v_B)\cdot\mathbf n_{{BC}}}}{{L_{{BC}}}}={omega_bc:.4f}\ \mathrm{{rad/s}}\quad({sign_omega})",
                 rf"\mathbf v_{{C/B}}=\omega_{{BC}}\mathbf k\times\mathbf r_{{C/B}}={_vec_latex(vcb, 'm/s')}",
                 rf"\mathbf v_C={_vec_latex(vc, 'm/s')},\quad |\mathbf v_C|={abs(v_c_signed):.4f}\ \mathrm{{m/s}}\quad({sign_vc})",
@@ -1328,7 +1448,7 @@ def make_random_two_link_problem(seed):
             "4. Member AB: acceleration of B",
             [
                 rf"\boldsymbol\alpha_{{AB}}={RANDOM_ALPHA_AB:.2f}\mathbf k\ \mathrm{{rad/s^2}}",
-                r"\mathbf a_B=\mathbf a_A+\boldsymbol\alpha_{AB}\times\mathbf r_{B/A}-\omega_{AB}^2\mathbf r_{B/A},\qquad \mathbf a_A=\mathbf0",
+                r"\mathbf{a}_B=\mathbf{a}_A+\boldsymbol\alpha_{AB}\times\mathbf{r}_{B/A}-\omega_{AB}^2\mathbf{r}_{B/A},\qquad \mathbf{a}_A=\mathbf0",
                 rf"\mathbf a^t_{{B/A}}=\boldsymbol\alpha_{{AB}}\times\mathbf r_{{B/A}}={_vec_latex(abt, 'm/s^2')},\quad |a^t_{{B/A}}|={np.linalg.norm(abt):.4f}\ \mathrm{{m/s^2}}",
                 rf"\mathbf a^n_{{B/A}}=-\omega_{{AB}}^2\mathbf r_{{B/A}}={_vec_latex(abn, 'm/s^2')},\quad |a^n_{{B/A}}|={np.linalg.norm(abn):.4f}\ \mathrm{{m/s^2}}",
                 rf"\mathbf a_B=\mathbf a^t_{{B/A}}+\mathbf a^n_{{B/A}}={_vec_latex(ab, 'm/s^2')}",
@@ -1338,7 +1458,7 @@ def make_random_two_link_problem(seed):
         (
             "5. Member BC: relative acceleration and x-y equations",
             [
-                r"\mathbf a_C=\mathbf a_B+\boldsymbol\alpha_{BC}\times\mathbf r_{C/B}-\omega_{BC}^2\mathbf r_{C/B}",
+                r"\mathbf{a}_C=\mathbf{a}_B+\boldsymbol\alpha_{BC}\times\mathbf{r}_{C/B}-\omega_{BC}^2\mathbf{r}_{C/B}",
                 rf"x:\quad {d[0]:.4f}\ddot s_C={ab[0]:.4f}{(-rc[1]):+.4f}\alpha_{{BC}}{(-omega_bc**2*rc[0]):+.4f}",
                 rf"y:\quad {d[1]:.4f}\ddot s_C={ab[1]:.4f}{rc[0]:+.4f}\alpha_{{BC}}{(-omega_bc**2*rc[1]):+.4f}",
                 rf"\ddot s_C=\frac{{\mathbf a_B\cdot\mathbf e_{{BC}}-\omega_{{BC}}^2L_{{BC}}}}{{\mathbf d_C\cdot\mathbf e_{{BC}}}}={a_c_signed:.4f}\ \mathrm{{m/s^2}}",
@@ -1391,13 +1511,13 @@ def make_random_two_link_problem(seed):
             },
             {
                 "q": "What is the permitted direction of velocity and acceleration of C?",
-                "options": ["Along its straight guide", "Perpendicular to its guide", "Along BC only", "Any direction"],
+                "options": ["Along its straight guide", "Perpendicular to its guide", "Always horizontally", "Unrestricted by the guide"],
                 "correct": "Along its straight guide",
                 "why": "A slider in a fixed straight guide can have velocity and acceleration only along the guide.",
             },
             {
                 "q": "Where does the relative normal acceleration a_n(C/B) point?",
-                "options": ["From C toward B", "From B toward C", "Perpendicular to BC", "Along the guide"],
+                "options": ["From C toward B", "From B toward C", "Perpendicular to BC", "It is always zero"],
                 "correct": "From C toward B",
                 "why": "The relative normal term is -omega_BC squared times r_C/B, so it points from C toward B.",
             },
@@ -1429,10 +1549,10 @@ def make_random_two_link_problem(seed):
         "solve_outputs": [
             {"label": "Speed of point B", "key": "vBmag", "value": float(np.linalg.norm(vb)), "tol": 0.03, "unit": "m/s"},
             {"label": "Angular velocity \u03c9_BC (CCW positive)", "key": "omegaBC", "value": omega_bc, "tol": 0.03, "unit": "rad/s"},
-            {"label": "Velocity of C along +s_C", "key": "vC", "value": v_c_signed, "tol": 0.04, "unit": "m/s"},
+            {"label": "Velocity of C (positive along the +s_C arrow)", "key": "vC", "value": v_c_signed, "tol": 0.04, "unit": "m/s"},
             {"label": "Acceleration magnitude of point B", "key": "aBmag", "value": float(np.linalg.norm(ab)), "tol": 0.05, "unit": "m/s\u00b2"},
             {"label": "Angular acceleration \u03b1_BC (CCW positive)", "key": "alphaBC", "value": alpha_bc, "tol": 0.05, "unit": "rad/s\u00b2"},
-            {"label": "Acceleration of C along +s_C", "key": "aC", "value": a_c_signed, "tol": 0.06, "unit": "m/s\u00b2"},
+            {"label": "Acceleration of C (positive along the +s_C arrow)", "key": "aC", "value": a_c_signed, "tol": 0.06, "unit": "m/s\u00b2"},
         ],
         "vector_lines": [
             groups[0][1][1], groups[0][1][2], groups[0][1][3],
@@ -1478,6 +1598,18 @@ def validate_randomized_activity():
                     raise RuntimeError("Randomized slider velocity violates its guide.")
                 if abs(_cross2d(vectors["guide"], vectors["a_c"])) > 1.0e-8:
                     raise RuntimeError("Randomized slider acceleration violates its guide.")
+                # Independent component solve: [d_C, -k cross r_C/B] [u,w] = v_B.
+                matrix = np.column_stack((vectors["guide"], -_perp(vectors["r_cb"])))
+                speed, omega = np.linalg.solve(matrix, vectors["v_b"])
+                acceleration, alpha = np.linalg.solve(
+                    matrix, vectors["a_b"] - omega ** 2 * vectors["r_cb"]
+                )
+                if not np.allclose(
+                    [speed, omega, acceleration, alpha],
+                    [data["v_c_signed"], data["omega_bc"], data["a_c_signed"], data["alpha_bc"]],
+                    rtol=1.0e-11, atol=1.0e-10,
+                ):
+                    raise RuntimeError("Independent randomized component solve failed.")
     if valid_count < 100:
         raise RuntimeError("Too few valid randomized two-link geometries.")
     return True
@@ -1504,32 +1636,20 @@ def validate_problem_catalog():
             for item in problem[group_name]:
                 if item["correct"] not in item["options"]:
                     raise RuntimeError("Invalid answer key in " + problem["id"])
+                if len(set(item["options"])) != len(item["options"]):
+                    raise RuntimeError("Duplicate choices in " + problem["id"])
         for output in problem["solve_outputs"]:
             if not math.isfinite(float(output["value"])) or float(output["tol"]) <= 0:
                 raise RuntimeError("Invalid numeric target in " + problem["id"])
 
-    root2 = math.sqrt(2.0)
-    root3 = math.sqrt(3.0)
-    independent_targets = {
-        "V1": [6.0 * 0.30],
-        "V2": [2.0 / (0.50 * 0.50), 8.0 * 0.50 * root3 / 2.0],
-        "V3": [-8.0 / (2.0 * root2), 8.0 / (2.0 * root2)],
-        "V4": [1.9596, 1.3384],
-        "V5": [12.0 * 0.200 / 0.125],
-        "V6": [18.0 * 20.0 / 60.0 * 30.0 / 90.0],
-        "A1": [4.0 * 0.30, 6.0 ** 2 * 0.30, math.hypot(4.0 * 0.30, 6.0 ** 2 * 0.30)],
-        "A2": [-16.0 * (0.50 * root3 / 2.0) / (0.50 * 0.50), -16.0],
-        "A3": [3.0 * 3.0 * 0.200 / 0.125, 3.0 * 0.200 / 0.125, 3.0 * 0.200,
-               (3.0 * 3.0 * 0.200 / 0.125) ** 2 * 0.125],
-        "A4": [(-2.1213203436 - 16.0) / 2.0, (2.1213203436 + 16.0) / 2.0],
-    }
     for problem in PROBLEMS:
-        stored = [float(item["value"]) for item in problem["solve_outputs"]]
-        computed = independent_targets[problem["id"]]
-        if len(stored) != len(computed):
+        computed = solve_guided_problem(problem["id"])["outputs"]
+        if {out["key"] for out in problem["solve_outputs"]} != set(computed):
             raise RuntimeError("Target count mismatch for " + problem["id"])
-        for stored_value, computed_value in zip(stored, computed):
-            if abs(stored_value - computed_value) > 0.001:
+        for output in problem["solve_outputs"]:
+            stored_value = float(output["value"])
+            computed_value = float(computed[output["key"]])
+            if not math.isclose(stored_value, computed_value, rel_tol=1.0e-10, abs_tol=1.0e-9):
                 raise RuntimeError(
                     "Independent target check failed for " + problem["id"] +
                     ": stored=" + repr(stored_value) + ", computed=" + repr(computed_value)
@@ -1681,11 +1801,12 @@ def _slider_geometry(ax):
 
 def _linked_geometry(ax):
     A = np.array([0.8, 3.1])
-    B = np.array([3.6, 3.1])
-    C = np.array([3.6, 0.5])
+    # Both 2 m links use the same drawing scale.
+    B = A + np.array([2.6, 0.0])
+    C = B + np.array([0.0, -2.6])
     # Slider groove is drawn as two parallel rails; its centreline passes through C.
-    rail_x = np.array([2.45, 5.55])
-    centre_y = -rail_x + 4.10
+    rail_x = np.array([C[0] - 1.05, C[0] + 1.75])
+    centre_y = C[1] - (rail_x - C[0])
     offset = 0.17 * math.sqrt(2.0)
     ax.plot(rail_x, centre_y + offset, color=COLORS["guide"], lw=2.0, zorder=1)
     ax.plot(rail_x, centre_y - offset, color=COLORS["guide"], lw=2.0, zorder=1)
@@ -1702,10 +1823,12 @@ def _linked_geometry(ax):
             fontsize=10.2, color=COLORS["link"], ha="center")
     ax.text(B[0] - 0.34, (B[1] + C[1]) / 2.0, "BC = 2 m",
             fontsize=10.2, color=COLORS["link"], rotation=90, va="center")
-    ax.plot([4.55, 5.15], [-0.58, -0.58], color=COLORS["construct"], lw=1.1, ls="--")
-    draw_angle_arc(ax, np.array([4.55, -0.58]), 0.42, 0.0, 45.0, "45\u00b0",
+    vertex = C + np.array([0.90, -0.90])
+    ax.plot([vertex[0], vertex[0] + 0.70], [vertex[1], vertex[1]],
+            color=COLORS["construct"], lw=1.1, ls="--")
+    draw_angle_arc(ax, vertex, 0.42, -45.0, 0.0, "45\u00b0",
                    COLORS["construct"], 0.66)
-    ax.text(4.62, -0.97, "inclined groove", fontsize=9.0, color=COLORS["construct"])
+    ax.text(4.35, -1.08, "inclined groove", fontsize=9.0, color=COLORS["construct"])
     return A, B, C
 
 
@@ -1740,6 +1863,8 @@ def _belt_tangent_segments(A, rA, B, rB, crossed):
     A = np.asarray(A, dtype=float)
     B = np.asarray(B, dtype=float)
     distance = float(np.linalg.norm(B - A))
+    if rA <= 0 or rB <= 0 or distance <= rA + rB:
+        raise ValueError("Belt pulleys must have positive radii and separate, non-overlapping rims.")
     direction = (B - A) / distance
     perpendicular = np.array([-direction[1], direction[0]])
     segments = []
@@ -1762,7 +1887,7 @@ def _belt_geometry(ax, crossed=False):
     A = np.array([1.75, 2.05])
     B = np.array([6.15, 2.05])
     rA = 0.92
-    rB = 0.58
+    rB = rA * 0.125 / 0.200
     ax.add_patch(Circle(A, rA, fill=False, ec=COLORS["link"], lw=2.5, zorder=2))
     ax.add_patch(Circle(B, rB, fill=False, ec=COLORS["link"], lw=2.5, zorder=2))
     for start, end in _belt_tangent_segments(A, rA, B, rB, crossed):
@@ -1826,7 +1951,7 @@ def _random_two_link_geometry(ax, problem, transparent=False):
         ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color=COLORS["guide"], lw=2.0, zorder=1)
     phi = data["guide_abs"]
     ax.add_patch(Rectangle(
-        (C[0] - 0.24, C[1] - 0.14), 0.48, 0.28,
+        (C[0] - 0.24, C[1] - 0.09), 0.48, 0.18,
         angle=phi, rotation_point="center", fill=False,
         ec=COLORS["link"], lw=1.9, zorder=3,
     ))
@@ -1840,12 +1965,13 @@ def _random_two_link_geometry(ax, problem, transparent=False):
     theta_ab = data["theta_ab"]
     theta_bc = data["theta_bc_down"]
     guide_down = data["guide_down"]
-    ax.plot([A[0], A[0] + 0.92], [A[1], A[1]], color=COLORS["construct"], lw=1.1, ls="--")
-    draw_angle_arc(ax, A, 0.48, 0.0, theta_ab, rf"$\theta_{{AB}}={theta_ab:.0f}^\circ$",
-                   COLORS["construct"], 0.76)
-    ax.plot([B[0], B[0] - 0.90], [B[1], B[1]], color=COLORS["construct"], lw=1.1, ls="--")
-    draw_angle_arc(ax, B, 0.44, 180.0, 180.0 + theta_bc,
-                   rf"$\theta_{{BC}}={theta_bc:.0f}^\circ$", COLORS["construct"], 0.95)
+    if not transparent:
+        ax.plot([A[0], A[0] + 0.92], [A[1], A[1]], color=COLORS["construct"], lw=1.1, ls="--")
+        draw_angle_arc(ax, A, 0.48, 0.0, theta_ab, rf"$\theta_{{AB}}={theta_ab:.0f}^\circ$",
+                       COLORS["construct"], 0.76)
+        ax.plot([B[0], B[0] - 0.90], [B[1], B[1]], color=COLORS["construct"], lw=1.1, ls="--")
+        draw_angle_arc(ax, B, 0.44, 180.0, 180.0 + theta_bc,
+                       rf"$\theta_{{BC}}={theta_bc:.0f}^\circ$", COLORS["construct"], 0.95)
 
     # Dimension labels are offset from the link centrelines.
     mid_ab = (A + B) / 2.0
@@ -1861,23 +1987,25 @@ def _random_two_link_geometry(ax, problem, transparent=False):
                 ha="center", va="center")
 
     # The guide arrow is a constraint datum, not a solved velocity vector.
-    arrow_start = C - 0.12 * guide
-    arrow_end = C + 0.83 * guide
-    draw_arrow(ax, arrow_start, arrow_end, COLORS["known"], r"$+s_C$ permitted",
-               lw=2.0, label_offset=(-0.05, -0.16))
-    ref = C + 0.72 * np.array([-1.0, 0.0])
-    ax.plot([C[0], ref[0]], [C[1], ref[1]], color=COLORS["construct"], lw=1.0, ls="--")
-    draw_angle_arc(ax, C, 0.38, 180.0, 180.0 + guide_down,
-                   rf"$\gamma_C={guide_down:.0f}^\circ$", COLORS["known"], 0.61)
+    reference_offset = 0.42 * guide_normal if transparent else np.zeros(2)
+    arrow_start = C + reference_offset - 0.12 * guide
+    arrow_end = C + reference_offset + 0.68 * guide
+    draw_arrow(ax, arrow_start, arrow_end, COLORS["construct"] if transparent else COLORS["known"],
+               r"$+s_C$", lw=1.7, label_offset=(0.08, -0.16))
+    if not transparent:
+        ref = C + 0.72 * np.array([-1.0, 0.0])
+        ax.plot([C[0], ref[0]], [C[1], ref[1]], color=COLORS["construct"], lw=1.0, ls="--")
+        draw_angle_arc(ax, C, 0.38, 180.0, 180.0 + guide_down,
+                       rf"$\gamma_C={guide_down:.0f}^\circ$", COLORS["known"], 0.61)
 
-    draw_rotation_arrow(ax, A + np.array([1.00, -0.02]), 0.28, +1, COLORS["known"],
-                        rf"$\omega_{{AB}}={RANDOM_OMEGA_AB:.0f}$", start_deg=-55, sweep_deg=190,
-                        label_offset=(0.05, -0.10), alpha=0.92)
-    draw_rotation_arrow(ax, A + np.array([1.54, -0.02]), 0.24, +1, COLORS["tangent"],
-                        rf"$\alpha_{{AB}}={RANDOM_ALPHA_AB:.0f}$", start_deg=-55, sweep_deg=175,
-                        label_offset=(0.05, -0.10), alpha=0.92)
-    ax.text(A[0] + 0.30, A[1] - 0.76, r"$\omega$ in rad/s; $\alpha$ in rad/s$^2$",
-            fontsize=8.6, color=COLORS["construct"])
+        draw_rotation_arrow(ax, A + np.array([1.00, -0.02]), 0.28, +1, COLORS["known"],
+                            rf"$\omega_{{AB}}={RANDOM_OMEGA_AB:.0f}$", start_deg=-55, sweep_deg=190,
+                            label_offset=(0.05, -0.10), alpha=0.92)
+        draw_rotation_arrow(ax, A + np.array([1.54, -0.02]), 0.24, +1, COLORS["tangent"],
+                            rf"$\alpha_{{AB}}={RANDOM_ALPHA_AB:.0f}$", start_deg=-55, sweep_deg=175,
+                            label_offset=(0.05, -0.10), alpha=0.92)
+        ax.text(A[0] + 0.30, A[1] - 0.76, r"$\omega$ in rad/s; $\alpha$ in rad/s$^2$",
+                fontsize=8.6, color=COLORS["construct"])
 
     points = np.vstack([A, B, C, C - 1.25 * guide, C + 1.25 * guide])
     finish_axis(
@@ -1907,16 +2035,16 @@ def draw_random_two_link(problem, stage="question"):
     if stage == "velocity":
         draw_arrow(ax, B + np.array([0.12, 0.05]),
                    _schematic_vector_end(B + np.array([0.12, 0.05]), data["v_b"], 0.92),
-                   COLORS["known"], rf"$\mathbf{{v}}_B={np.linalg.norm(data['v_b']):.2f}$",
+                   COLORS["known"], rf"$|\mathbf{{v}}_B|={np.linalg.norm(data['v_b']):.2f}\ \mathrm{{m/s}}$",
                    label_offset=(-0.18, 0.14))
         draw_arrow(ax, C + np.array([-0.05, -0.05]),
                    _schematic_vector_end(C + np.array([-0.05, -0.05]), data["v_c"], 0.92),
-                   COLORS["resultant"], rf"$\mathbf{{v}}_C={abs(data['v_c_signed']):.2f}$",
+                   COLORS["resultant"], rf"$|\mathbf{{v}}_C|={abs(data['v_c_signed']):.2f}\ \mathrm{{m/s}}$",
                    label_offset=(0.10, -0.16))
-        rel_start = midpoint + np.array([-0.08, -0.08])
+        rel_start = midpoint + np.array([-0.55, 0.10])
         draw_arrow(ax, rel_start, _schematic_vector_end(rel_start, data["v_cb"], 0.82),
                    COLORS["relative"], r"$\mathbf{v}_{C/B}$", label_offset=(0.18, 0.10))
-        draw_rotation_arrow(ax, midpoint + np.array([0.45, 0.20]), 0.27,
+        draw_rotation_arrow(ax, midpoint + np.array([0.70, 0.40]), 0.27,
                             +1 if data["omega_bc"] >= 0.0 else -1, COLORS["relative"],
                             rf"$\omega_{{BC}}={data['omega_bc']:.2f}$", start_deg=-45, sweep_deg=185,
                             label_offset=(0.34, -0.10), alpha=0.90)
@@ -1927,16 +2055,21 @@ def draw_random_two_link(problem, stage="question"):
         draw_arrow(ax, C + np.array([-0.05, -0.04]),
                    _schematic_vector_end(C + np.array([-0.05, -0.04]), data["a_c"], 0.92),
                    COLORS["resultant"], r"$\mathbf{a}_C$", label_offset=(0.10, -0.16))
-        t_start = midpoint + np.array([-0.18, 0.18])
-        n_start = midpoint + np.array([0.16, -0.18])
+        t_start = midpoint + np.array([-0.65, 0.30])
+        n_start = midpoint + np.array([0.42, -0.28])
         draw_arrow(ax, t_start, _schematic_vector_end(t_start, data["a_cb_t"], 0.70),
                    COLORS["tangent"], r"$\mathbf{a}^{t}_{C/B}$", label_offset=(0.16, 0.12))
         draw_arrow(ax, n_start, _schematic_vector_end(n_start, data["a_cb_n"], 0.70),
                    COLORS["normal"], r"$\mathbf{a}^{n}_{C/B}$", label_offset=(-0.16, -0.12))
-        draw_rotation_arrow(ax, midpoint + np.array([0.50, 0.22]), 0.26,
+        draw_rotation_arrow(ax, midpoint + np.array([0.90, 0.30]), 0.26,
                             +1 if data["alpha_bc"] >= 0.0 else -1, COLORS["tangent"],
                             rf"$\alpha_{{BC}}={data['alpha_bc']:.2f}$", start_deg=-45, sweep_deg=185,
                             label_offset=(0.36, -0.10), alpha=0.90)
+    if stage != "question":
+        # Allow room for direction arrows that extend beyond the bare geometry.
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+        finish_axis(ax, (xmin - 0.45, xmax + 0.25), (ymin - 0.45, ymax + 0.45), transparent=True)
     return fig
 
 
@@ -1949,43 +2082,21 @@ def draw_random_vector_polygon(problem, quantity):
         colors = [COLORS["known"], COLORS["relative"]]
         resultant = data["v_c"]
         result_label = r"$\mathbf{v}_C$"
-        title = "Velocity polygon: v_C = v_B + v_C/B"
+        title = r"Velocity polygon: $\mathbf{v}_C=\mathbf{v}_B+\mathbf{v}_{C/B}$"
     else:
         vectors = [data["a_b"], data["a_cb_t"], data["a_cb_n"]]
         labels = [r"$\mathbf{a}_B$", r"$\mathbf{a}^{t}_{C/B}$", r"$\mathbf{a}^{n}_{C/B}$"]
         colors = [COLORS["known"], COLORS["tangent"], COLORS["normal"]]
         resultant = data["a_c"]
         result_label = r"$\mathbf{a}_C$"
-        title = "Acceleration polygon: a_C = a_B + a_t + a_n"
+        title = r"Acceleration polygon: $\mathbf{a}_C=\mathbf{a}_B+\mathbf{a}^t_{C/B}+\mathbf{a}^n_{C/B}$"
 
-    fig, ax = plt.subplots(figsize=(7.2, 4.6))
-    origin = np.array([0.0, 0.0])
-    cursor = origin.copy()
-    points = [origin.copy()]
-    for vector, label, color in zip(vectors, labels, colors):
-        next_point = cursor + vector
-        draw_arrow(ax, cursor, next_point, color, label, lw=2.3, mutation=15,
-                   label_offset=(0.0, 0.05 * max(1.0, np.linalg.norm(resultant))))
-        cursor = next_point
-        points.append(cursor.copy())
-    draw_arrow(ax, origin, resultant, COLORS["resultant"], result_label, lw=2.1,
-               ls="--", mutation=15, label_offset=(0.0, -0.05 * max(1.0, np.linalg.norm(resultant))))
-    points.append(np.asarray(resultant, dtype=float))
-    all_points = np.vstack(points)
-    span = np.maximum(all_points.max(axis=0) - all_points.min(axis=0), np.array([1.0, 1.0]))
-    margin = 0.20 * float(max(span))
-    ax.axhline(0.0, color=COLORS["guide"], lw=0.9, ls=":", alpha=0.72)
-    ax.axvline(0.0, color=COLORS["guide"], lw=0.9, ls=":", alpha=0.72)
-    ax.text(float(all_points[:, 0].min() - 0.05 * span[0]),
-            float(all_points[:, 1].max() + 0.12 * span[1]), title,
-            fontsize=10.0, color=COLORS["construct"], weight="bold")
-    finish_axis(
-        ax,
-        (float(all_points[:, 0].min() - margin), float(all_points[:, 0].max() + margin)),
-        (float(all_points[:, 1].min() - margin), float(all_points[:, 1].max() + margin)),
-        transparent=True,
+    if not np.allclose(np.sum(vectors, axis=0), resultant, rtol=1.0e-10, atol=1.0e-9):
+        raise RuntimeError("Vector polygon does not close.")
+    return draw_vector_chain(
+        vectors, labels, colors, title,
+        unit="m/s" if quantity == "velocity" else "m/s^2", resultant_label=result_label,
     )
-    return fig
 
 
 def draw_fixed_velocity(solution=False):
@@ -2024,12 +2135,14 @@ def draw_fixed_acceleration(solution=False):
                         label_offset=(-0.65, -0.55))
     ax.text(-1.22, -1.04, r"$\omega$ in rad/s; $\alpha$ in rad/s$^2$", fontsize=8.8, color=COLORS["construct"])
     if solution:
-        tangent = np.array([-math.sin(theta), math.cos(theta)])
-        inward = -P / np.linalg.norm(P)
-        draw_arrow(ax, P + 0.03 * tangent, P + 0.74 * tangent, COLORS["tangent"], r"$a_t=1.20$",
+        data = solve_guided_problem("A1")
+        scale = 0.085  # One common scale for all three acceleration vectors.
+        draw_arrow(ax, P, P + scale * data["a_t"], COLORS["tangent"], r"$a_t=1.20$",
                    label_offset=(0.16, 0.08))
-        draw_arrow(ax, P, P + 0.74 * inward, COLORS["normal"], r"$a_n=10.8$",
+        draw_arrow(ax, P, P + scale * data["a_n"], COLORS["normal"], r"$a_n=10.8$",
                    label_offset=(-0.02, -0.13))
+        draw_arrow(ax, P, P + scale * data["a_p"], COLORS["resultant"], r"$\mathbf{a}_P$",
+                   label_offset=(-0.19, 0.13), ls="--")
 
     finish_axis(ax, (-1.42, 2.02), (-1.28, 1.62), transparent=solution)
     return fig
@@ -2074,34 +2187,40 @@ def draw_slider_velocity(accel=False, solution=False):
 def draw_linked_velocity(accel=False, solution=False):
     fig, ax = plt.subplots(figsize=(8.6, 4.8))
     A, B, C = _linked_geometry(ax)
+    data = solve_guided_problem("A4" if accel else "V3")
     if accel:
         draw_arrow(ax, C + np.array([0.18, -0.02]), C + np.array([1.08, -0.92]),
                    COLORS["known"], r"$a_C=3.0\ \mathrm{m/s^2}$", label_offset=(0.20, -0.08))
         # Angular velocities are given from the preceding velocity step.
-        draw_rotation_arrow(ax, np.array([2.10, 3.10]), 0.34, -1, COLORS["known"], r"$\omega_{AB}=-2.828$",
+        draw_rotation_arrow(ax, (A + B) / 2.0, 0.34, -1, COLORS["known"], r"$\omega_{AB}=-2.828$",
                             start_deg=120, sweep_deg=190, label_offset=(-0.42, -0.08), alpha=0.92)
-        draw_rotation_arrow(ax, np.array([3.60, 1.82]), 0.32, +1, COLORS["known"], r"$\omega_{BC}=2.828$",
+        draw_rotation_arrow(ax, (B + C) / 2.0, 0.32, +1, COLORS["known"], r"$\omega_{BC}=2.828$",
                             start_deg=-55, sweep_deg=190, label_offset=(0.65, -0.02), alpha=0.92)
         if solution:
-            draw_arrow(ax, B + np.array([0.62, 0.08]), B + np.array([0.62, -1.04]),
+            start = B + np.array([0.65, 0.08])
+            draw_arrow(ax, start, _schematic_vector_end(start, data["a_b"], 1.12),
                        COLORS["resultant"], r"$a_B$", label_offset=(0.14, 0.0))
-            draw_arrow(ax, np.array([3.02, 2.14]), np.array([2.04, 2.14]),
+            start = (B + C) / 2.0 + np.array([-1.25, 0.35])
+            draw_arrow(ax, start, _schematic_vector_end(start, data["a_cb_t"], 0.98),
                        COLORS["tangent"], r"$a^t_{C/B}$", label_offset=(0.0, 0.13))
-            draw_arrow(ax, np.array([2.58, 1.02]), np.array([2.58, 1.96]),
+            start = (B + C) / 2.0 + np.array([-0.85, -0.75])
+            draw_arrow(ax, start, _schematic_vector_end(start, data["a_cb_n"], 0.94),
                        COLORS["normal"], r"$a^n_{C/B}$", label_offset=(-0.25, 0.0))
     else:
         draw_arrow(ax, C + np.array([0.18, -0.02]), C + np.array([1.10, -0.94]),
                    COLORS["known"], r"$v_C=8.0\ \mathrm{m/s}$", label_offset=(0.20, -0.08))
         if solution:
-            draw_arrow(ax, B + np.array([0.60, 0.06]), B + np.array([0.60, -1.06]),
+            start = B + np.array([0.60, 0.06])
+            draw_arrow(ax, start, _schematic_vector_end(start, data["v_b"], 1.12),
                        COLORS["resultant"], r"$v_B$", label_offset=(0.12, 0.0))
-            draw_arrow(ax, np.array([3.02, 1.75]), np.array([2.02, 1.75]),
+            start = (B + C) / 2.0 + np.array([-1.38, -0.05])
+            draw_arrow(ax, start, _schematic_vector_end(start, data["v_cb"], 1.00),
                        COLORS["relative"], r"$v_{C/B}$", label_offset=(0.0, 0.13))
-            draw_rotation_arrow(ax, np.array([2.10, 3.10]), 0.34, -1, COLORS["resultant"], r"$\omega_{AB}=-2.828$",
+            draw_rotation_arrow(ax, (A + B) / 2.0, 0.34, -1, COLORS["resultant"], r"$\omega_{AB}=-2.828$",
                                 start_deg=120, sweep_deg=190, label_offset=(-0.42, -0.08))
-            draw_rotation_arrow(ax, np.array([3.60, 1.82]), 0.32, +1, COLORS["resultant"], r"$\omega_{BC}=2.828$",
+            draw_rotation_arrow(ax, (B + C) / 2.0, 0.32, +1, COLORS["resultant"], r"$\omega_{BC}=2.828$",
                                 start_deg=-55, sweep_deg=190, label_offset=(0.65, -0.02))
-    finish_axis(ax, (0.05, 6.15), (-1.20, 3.92), transparent=solution)
+    finish_axis(ax, (0.05, 6.15), (-1.32, 4.12), transparent=solution)
     return fig
 
 
@@ -2112,11 +2231,12 @@ def draw_ic_velocity(solution=False):
                         start_deg=-75, sweep_deg=175, label_offset=(-0.20, -0.05))
     if solution:
         vB_direction = np.array([-1.0, 1.0]) / math.sqrt(2.0)
-        draw_arrow(ax, B, B + 0.95 * vB_direction, COLORS["known"], r"$v_B=1.20$",
+        draw_arrow(ax, B, B + 0.95 * vB_direction, COLORS["known"], r"$|v_B|=1.20$",
                    label_offset=(-0.25, 0.24))
         draw_arrow(ax, C + np.array([0.0, 0.34]), C + np.array([-1.18, 0.34]),
-                   COLORS["resultant"], r"$v_C=1.338$", label_offset=(0.0, 0.13))
-        IC = np.array([C[0], B[1] + (C[0] - B[0])])
+                   COLORS["resultant"], r"$|v_C|=1.338$", label_offset=(0.0, 0.13))
+        data = solve_guided_problem("V4")
+        IC = A + 6.0 * data["ic"]
         ax.plot([C[0], C[0]], [C[1], IC[1]], color=COLORS["construct"], lw=1.6, ls="--")
         ax.plot([B[0], IC[0]], [B[1], IC[1]], color=COLORS["construct"], lw=1.6, ls="--")
         ax.plot(*IC, "o", color=COLORS["relative"], ms=6, zorder=6)
@@ -2125,9 +2245,9 @@ def draw_ic_velocity(solution=False):
         middle = (B + IC) / 2.0
         ax.text(middle[0] - 0.23, middle[1] + 0.10, r"$r_{B/IC}$", fontsize=9.1,
                 color=COLORS["construct"], rotation=45)
-        draw_rotation_arrow(ax, IC, 0.40, -1, COLORS["resultant"], r"$\omega_{BC}=1.960\ \mathrm{CW}$",
+        draw_rotation_arrow(ax, IC, 0.40, -1, COLORS["resultant"], r"$\omega_{BC}=-1.960\ \mathrm{rad/s}$",
                             start_deg=110, sweep_deg=185, label_offset=(-0.45, -0.10))
-    finish_axis(ax, (-0.15, 6.10), (-1.02, 4.20), transparent=solution)
+    finish_axis(ax, (-0.15, 6.10), (-1.02, 5.12 if solution else 3.05), transparent=solution)
     return fig
 
 
@@ -2142,11 +2262,14 @@ def draw_belt_velocity(accel=False, solution=False):
         ax.text(0.55, 0.37, r"$\omega_A(0)=0,\quad t=3\ \mathrm{s}$", fontsize=9.1, color=COLORS["known"])
         if solution:
             draw_rotation_arrow(ax, B, 0.38, -1, COLORS["resultant"],
-                                r"$\omega_B=14.4,\ \alpha_B=4.8$", start_deg=125, sweep_deg=200,
+                                r"$\omega_B=-14.4,\ \alpha_B=-4.8$", start_deg=125, sweep_deg=200,
                                 label_offset=(0.05, -0.10))
             for start, end in _belt_tangent_segments(A, rA, B, rB, True):
                 midpoint = (start + end) / 2.0
                 tangent = (end - start) / np.linalg.norm(end - start)
+                # Orient each span from its actual contact velocity at A.
+                contact_velocity = _perp(start - A)  # A rotates CCW.
+                tangent *= 1.0 if np.dot(contact_velocity, tangent) > 0.0 else -1.0
                 draw_arrow(ax, midpoint - 0.45 * tangent, midpoint + 0.45 * tangent,
                            COLORS["relative"], None, lw=1.9, alpha=0.88)
     else:
@@ -2158,6 +2281,8 @@ def draw_belt_velocity(accel=False, solution=False):
             for start, end in _belt_tangent_segments(A, rA, B, rB, False):
                 midpoint = (start + end) / 2.0
                 tangent = (end - start) / np.linalg.norm(end - start)
+                contact_velocity = _perp(start - A)
+                tangent *= 1.0 if np.dot(contact_velocity, tangent) > 0.0 else -1.0
                 draw_arrow(ax, midpoint - 0.48 * tangent, midpoint + 0.48 * tangent,
                            COLORS["relative"], r"$v_{belt}=2.40\ \mathrm{m/s}$" if midpoint[1] > A[1] else None,
                            lw=1.9, label_offset=(0.0, 0.13), alpha=0.88)
@@ -2177,96 +2302,109 @@ def draw_gear_train(solution=False):
                             start_deg=115, sweep_deg=180, label_offset=(0.45, -0.02), alpha=0.92)
         ax.text(0.60, 0.12, "Each external mesh reverses direction; the common B-C shaft does not.",
                 fontsize=8.9, color=COLORS["construct"])
-    finish_axis(ax, (-0.62, 7.32), (0.02, 4.35), transparent=solution)
+    ax.text(0.60, -0.21, "Pitch-circle projection: A-B and C-D occupy separate axial planes.",
+            fontsize=8.7, color=COLORS["construct"])
+    finish_axis(ax, (-0.62, 7.32), (-0.40, 4.35), transparent=solution)
     return fig
 
 
-def draw_vector_chain(vectors, labels, colors, title, xlim, ylim):
-    """Head-to-tail vector diagram kept separate from the mechanism drawing."""
-    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+def draw_vector_chain(vectors, labels, colors, title, xlim=None, ylim=None,
+                      unit="", resultant_label=r"$\mathrm{resultant}$"):
+    """Draw a head-to-tail polygon with actual components and one common scale."""
+    vectors = [_vec2(vector) for vector in vectors]
+    points = np.vstack([np.zeros(2), np.cumsum(vectors, axis=0)])
+    span = max(1.0, float(np.ptp(points, axis=0).max()))
+    margin = 0.23 * span
+    if xlim is None:
+        xlim = (float(points[:, 0].min() - margin), float(points[:, 0].max() + margin))
+    if ylim is None:
+        ylim = (float(points[:, 1].min() - margin), float(points[:, 1].max() + margin))
+    fig, ax = plt.subplots(figsize=(6.8, 4.6))
     origin = np.array([0.0, 0.0])
     cursor = origin.copy()
     for vector, label, color in zip(vectors, labels, colors):
-        vector = np.asarray(vector, dtype=float)
         next_point = cursor + vector
+        offset = 0.055 * span * _perp(vector) / max(np.linalg.norm(vector), 1.0e-12)
+        arrow_size = min(15.0, max(4.0, 15.0 * math.sqrt(np.linalg.norm(vector) / span)))
         draw_arrow(ax, cursor, next_point, color, label, lw=2.4,
-                   label_offset=(0.0, 0.14), mutation=15)
+                   label_offset=offset, mutation=arrow_size)
         cursor = next_point
-    draw_arrow(ax, origin, cursor, COLORS["resultant"], r"$\mathrm{resultant}$", lw=2.0,
-               ls="--", alpha=0.80, label_offset=(0.0, -0.17))
+    result_offset = -0.085 * span * _perp(cursor) / max(np.linalg.norm(cursor), 1.0e-12)
+    draw_arrow(ax, origin, cursor, COLORS["resultant"], resultant_label, lw=2.0,
+               ls="--", alpha=0.80, label_offset=result_offset)
     ax.axhline(0.0, color=COLORS["guide"], lw=1.0, ls=":", alpha=0.75)
     ax.axvline(0.0, color=COLORS["guide"], lw=1.0, ls=":", alpha=0.75)
-    ax.text(xlim[0] + 0.06 * (xlim[1] - xlim[0]), ylim[1] - 0.10 * (ylim[1] - ylim[0]),
-            title, fontsize=10.2, color=COLORS["construct"], weight="bold")
+    ax.set_title(title, fontsize=10.2, color=COLORS["construct"], weight="bold", pad=12)
+    ax.text(0.01, 0.01, r"$+x$ right; $+y$ up" + (r"; $\mathrm{" + unit + "}$" if unit else ""),
+            transform=ax.transAxes, fontsize=8.5, color=COLORS["construct"])
     finish_axis(ax, xlim, ylim, transparent=True)
     return fig
 
 
 def draw_local_acceleration_components_A3():
-    """Illustrative local n-t diagram; arrow lengths are not to scale."""
-    fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    P = np.array([0.0, 0.0])
-    ax.plot(*P, "o", color="#111827", ms=7, zorder=6)
-    ax.text(P[0] - 0.18, P[1] + 0.18, "P", fontsize=11, weight="bold")
-    draw_arrow(ax, P, P + np.array([2.35, 0.0]), COLORS["tangent"],
-               r"$a_t=0.60\ \mathrm{m/s^2}$", label_offset=(0.0, 0.18), mutation=15)
-    draw_arrow(ax, P, P + np.array([0.0, -2.35]), COLORS["normal"],
-               r"$a_n=25.92\ \mathrm{m/s^2}$", label_offset=(-0.42, 0.0), mutation=15)
-    draw_arrow(ax, P, P + np.array([0.48, -2.08]), COLORS["resultant"],
-               r"$\mathbf{a}_P$", label_offset=(0.28, 0.0), ls="--", alpha=0.85)
-    ax.text(0.36, -2.78, "Arrow lengths are schematic; values are labelled.",
-            fontsize=8.9, color=COLORS["construct"], ha="center")
-    ax.text(-0.42, 0.72, "Point P on pulley B: local tangential-normal directions",
-            fontsize=10.0, color=COLORS["construct"], weight="bold")
-    finish_axis(ax, (-0.78, 3.20), (-3.05, 1.15), transparent=True)
-    return fig
+    """At the top of B, the real resultant is almost vertically downward."""
+    data = solve_guided_problem("A3")
+    return draw_vector_chain(
+        [data["a_t"], data["a_n"]],
+        [r"$a_t=0.60$", r"$a_n=25.92$"],
+        [COLORS["tangent"], COLORS["normal"]],
+        "Point P at top of B: true acceleration scale",
+        (-8.5, 10.0), (-29.5, 4.5), unit="m/s^2", resultant_label=r"$\mathbf{a}_P$",
+    )
 
 
 def draw_component_diagram(problem_id):
     """Return a separate pedagogical vector/component diagram where it adds value."""
+    data = solve_guided_problem(problem_id)
     if problem_id == "V2":
         return draw_vector_chain(
-            [(2.0, 0.0), (-2.0, 3.464)],
+            [data["v_a"], data["v_ba"]],
             [r"$\mathbf{v}_A$", r"$\mathbf{v}_{B/A}$"],
             [COLORS["known"], COLORS["relative"]],
-            "Velocity polygon: v_B = v_A + v_B/A", (-0.55, 2.65), (-0.55, 4.15),
+            r"Velocity polygon: $\mathbf{v}_B=\mathbf{v}_A+\mathbf{v}_{B/A}$",
+            unit="m/s", resultant_label=r"$\mathbf{v}_B$",
         )
     if problem_id == "V3":
         return draw_vector_chain(
-            [(0.0, -5.657), (5.657, 0.0)],
+            [data["v_b"], data["v_cb"]],
             [r"$\mathbf{v}_B$", r"$\mathbf{v}_{C/B}$"],
             [COLORS["known"], COLORS["relative"]],
-            "Velocity polygon: v_C = v_B + v_C/B", (-0.95, 6.55), (-6.55, 0.90),
+            r"Velocity polygon: $\mathbf{v}_C=\mathbf{v}_B+\mathbf{v}_{C/B}$",
+            unit="m/s", resultant_label=r"$\mathbf{v}_C$",
         )
     if problem_id == "V4":
         return draw_vector_chain(
-            [(-0.8485, 0.8485), (-0.4899, -0.8485)],
+            [data["v_b"], data["v_cb"]],
             [r"$\mathbf{v}_B$", r"$\mathbf{v}_{C/B}$"],
             [COLORS["known"], COLORS["relative"]],
-            "Component check: the slider result is horizontal", (-1.72, 0.38), (-0.40, 1.30),
+            "Component check: the slider result is horizontal",
+            unit="m/s", resultant_label=r"$\mathbf{v}_C$",
         )
     if problem_id == "A1":
         return draw_vector_chain(
-            [(0.0, 1.20), (-10.80, 0.0)],
+            [data["a_t"], data["a_n"]],
             [r"$\mathbf{a}_t$", r"$\mathbf{a}_n$"],
             [COLORS["tangent"], COLORS["normal"]],
-            "Perpendicular acceleration components", (-12.25, 0.85), (-0.75, 2.15),
+            "Actual components at P in the shown x-y frame",
+            unit="m/s^2", resultant_label=r"$\mathbf{a}_P$",
         )
     if problem_id == "A2":
         return draw_vector_chain(
-            [(6.928, -12.0), (-6.928, -4.0)],
+            [data["a_ba_t"], data["a_ba_n"]],
             [r"$\mathbf{a}^t_{B/A}$", r"$\mathbf{a}^n_{B/A}$"],
             [COLORS["tangent"], COLORS["normal"]],
-            "Acceleration polygon: horizontal parts cancel", (-1.25, 8.15), (-17.75, 1.45),
+            "Acceleration polygon: horizontal parts cancel",
+            unit="m/s^2", resultant_label=r"$\mathbf{a}_B$",
         )
     if problem_id == "A3":
         return draw_local_acceleration_components_A3()
     if problem_id == "A4":
         return draw_vector_chain(
-            [(-16.0, -18.121), (18.121, 0.0), (0.0, 16.0)],
+            [data["a_b"], data["a_cb_t"], data["a_cb_n"]],
             [r"$\mathbf{a}_B$", r"$\mathbf{a}^t_{C/B}$", r"$\mathbf{a}^n_{C/B}$"],
             [COLORS["known"], COLORS["tangent"], COLORS["normal"]],
-            "Acceleration polygon: a_C = a_B + a_t + a_n", (-18.5, 4.45), (-20.4, 2.65),
+            r"Acceleration polygon: $\mathbf{a}_C=\mathbf{a}_B+\mathbf{a}^t_{C/B}+\mathbf{a}^n_{C/B}$",
+            unit="m/s^2", resultant_label=r"$\mathbf{a}_C$",
         )
     return None
 
@@ -2298,7 +2436,15 @@ def render_problem_figure(problem):
         fig = draw_random_two_link(problem, stage="question")
     else:
         fig, _ = plt.subplots()
-    st.pyplot(fig, clear_figure=True, width="stretch")
+    _show_figure(fig)
+
+
+def _show_figure(fig):
+    """Release figure managers as well as artists after each Streamlit render."""
+    try:
+        st.pyplot(fig, clear_figure=True, width="stretch")
+    finally:
+        plt.close(fig)
 
 
 def _solution_mechanism_figure(problem):
@@ -2333,40 +2479,41 @@ def render_solution_diagrams(problem):
     """Render solution-only figures with transparent canvases and no overlays."""
     st.markdown("### Solution diagrams")
     st.caption(
-        "These diagrams intentionally appear only in the Solution tab. "
-        "Each figure uses a transparent canvas and a separate plotting area so vectors do not hide the mechanism."
+        "Mechanism arrows show directions; their lengths are schematic unless stated otherwise. "
+        "The separate head-to-tail polygons use the calculated components and a common scale, "
+        "with +x right and +y up."
     )
     if problem["diagram"] == "random_two_link":
         st.markdown("**Velocity analysis**")
         left, right = st.columns(2, gap="large")
         with left:
             st.caption("Mechanism with absolute and relative velocity vectors")
-            st.pyplot(draw_random_two_link(problem, stage="velocity"), clear_figure=True, width="stretch")
+            _show_figure(draw_random_two_link(problem, stage="velocity"))
         with right:
             st.caption("Head-to-tail velocity closure using the calculated values")
-            st.pyplot(draw_random_vector_polygon(problem, "velocity"), clear_figure=True, width="stretch")
+            _show_figure(draw_random_vector_polygon(problem, "velocity"))
         st.markdown("**Acceleration analysis**")
         left, right = st.columns(2, gap="large")
         with left:
             st.caption("Mechanism with tangential, normal, and absolute acceleration vectors")
-            st.pyplot(draw_random_two_link(problem, stage="acceleration"), clear_figure=True, width="stretch")
+            _show_figure(draw_random_two_link(problem, stage="acceleration"))
         with right:
             st.caption("Head-to-tail acceleration closure using the calculated values")
-            st.pyplot(draw_random_vector_polygon(problem, "acceleration"), clear_figure=True, width="stretch")
+            _show_figure(draw_random_vector_polygon(problem, "acceleration"))
         st.markdown(vector_legend_html(problem["topic"]), unsafe_allow_html=True)
         return
 
     component = draw_component_diagram(problem["id"])
     if component is None:
-        st.pyplot(_solution_mechanism_figure(problem), clear_figure=True, width="stretch")
+        _show_figure(_solution_mechanism_figure(problem))
     else:
         left, right = st.columns(2, gap="large")
         with left:
             st.markdown("**Motion and constraint diagram**")
-            st.pyplot(_solution_mechanism_figure(problem), clear_figure=True, width="stretch")
+            _show_figure(_solution_mechanism_figure(problem))
         with right:
             st.markdown("**Component / construction diagram**")
-            st.pyplot(component, clear_figure=True, width="stretch")
+            _show_figure(component)
     st.markdown(vector_legend_html(problem["topic"]), unsafe_allow_html=True)
 
 def render_learn_tab(topic):
@@ -2377,6 +2524,8 @@ def render_learn_tab(topic):
         Use this tab before solving. The goal is to teach a method:
         first identify the motion constraints, then choose the correct equation,
         and only after that substitute the numbers.
+        All sliders here have fixed straight guides. Belts are inextensible and do not slip;
+        pulley and gear centres are fixed.
         </div>
         """,
         unsafe_allow_html=True,
@@ -2389,27 +2538,27 @@ def render_learn_tab(topic):
             st.markdown(
                 r"""
                 1. Adopt **+x right, +y up, and counterclockwise positive**.  
-                2. Use fixed-axis rotation of AB to find $\mathbf v_B$ and $\mathbf a_B$.  
-                3. Represent the slider quantities as $\mathbf v_C=s_C\mathbf d_C$ and $\mathbf a_C=\ddot s_C\mathbf d_C$.  
-                4. Apply relative velocity to BC and solve the two component equations for $s_C$ and $\omega_{BC}$.  
+                2. Use fixed-axis rotation of AB to find $\mathbf{v}_B$ and $\mathbf{a}_B$.  
+                3. Let $s_C$ be displacement along the guide and $\mathbf{d}_C$ its fixed unit direction. Then $\mathbf{v}_C=\dot s_C\mathbf{d}_C$ and $\mathbf{a}_C=\ddot s_C\mathbf{d}_C$.  
+                4. Apply relative velocity to BC and solve the two component equations for $\dot s_C$ and $\omega_{BC}$.  
                 5. Use that $\omega_{BC}$ in the relative-acceleration equation, including both tangential and normal terms.  
                 6. Check that the velocity and acceleration vector polygons close.
                 """
             )
             st.markdown("### Vector equations")
-            st.latex(r"\mathbf v_B=\boldsymbol\omega_{AB}\times\mathbf r_{B/A}")
-            st.latex(r"\mathbf v_C=\mathbf v_B+\boldsymbol\omega_{BC}\times\mathbf r_{C/B}")
-            st.latex(r"\mathbf a_B=\boldsymbol\alpha_{AB}\times\mathbf r_{B/A}-\omega_{AB}^{2}\mathbf r_{B/A}")
-            st.latex(r"\mathbf a_C=\mathbf a_B+\boldsymbol\alpha_{BC}\times\mathbf r_{C/B}-\omega_{BC}^{2}\mathbf r_{C/B}")
+            st.latex(r"\mathbf{v}_B=\boldsymbol\omega_{AB}\times\mathbf{r}_{B/A}")
+            st.latex(r"\mathbf{v}_C=\mathbf{v}_B+\boldsymbol\omega_{BC}\times\mathbf{r}_{C/B}")
+            st.latex(r"\mathbf{a}_B=\boldsymbol\alpha_{AB}\times\mathbf{r}_{B/A}-\omega_{AB}^{2}\mathbf{r}_{B/A}")
+            st.latex(r"\mathbf{a}_C=\mathbf{a}_B+\boldsymbol\alpha_{BC}\times\mathbf{r}_{C/B}-\omega_{BC}^{2}\mathbf{r}_{C/B}")
         with right:
             st.markdown("### Sign and direction reminders")
             st.markdown(
                 r"""
-                - $\mathbf v_B$ is perpendicular to AB.  
-                - $\mathbf v_{C/B}$ is perpendicular to BC.  
-                - $\mathbf a^t_{C/B}$ is perpendicular to BC.  
-                - $\mathbf a^n_{C/B}$ points from C toward B.  
-                - Both $\mathbf v_C$ and $\mathbf a_C$ lie along the fixed straight guide.  
+                - $\mathbf{v}_B$ is perpendicular to AB.  
+                - $\mathbf{v}_{C/B}$ is perpendicular to BC.  
+                - $\mathbf{a}^t_{C/B}$ is perpendicular to BC.  
+                - $\mathbf{a}^n_{C/B}$ points from C toward B.  
+                - Both $\mathbf{v}_C$ and $\mathbf{a}_C$ lie along the fixed straight guide.  
                 - A negative $\omega$ or $\alpha$ means clockwise. A negative slider scalar means opposite the displayed positive guide arrow.
                 """
             )
@@ -2447,17 +2596,19 @@ def render_learn_tab(topic):
             )
 
             st.markdown("### Core equations")
-            st.latex(r"\mathbf v_B=\mathbf v_A+\boldsymbol\omega\times\mathbf r_{B/A}")
-            st.latex(r"v=\omega r \qquad \text{(fixed-axis rotation)}")
-            st.latex(r"\omega_A r_A=\omega_B r_B \qquad \text{(no-slip belt / pulley, equal tangential speed)}")
-            st.latex(r"\omega_1 r_1=\omega_2 r_2 \quad \text{or} \quad \omega_1 N_1=\omega_2 N_2 \qquad \text{(gear magnitudes)}")
-            st.latex(r"v=\omega\,r_{/IC} \qquad \text{(instantaneous-centre method)}")
+            st.latex(r"\mathbf{v}_B=\mathbf{v}_A+\boldsymbol\omega\times\mathbf{r}_{B/A}")
+            st.latex(r"v=|\omega|r \qquad \text{(speed in fixed-axis rotation)}")
+            st.latex(r"\omega_A r_A=\omega_B r_B\ \text{(open belt)},\qquad\omega_A r_A=-\omega_B r_B\ \text{(crossed belt)}")
+            st.latex(r"\omega_1 N_1=-\omega_2 N_2\ \text{(external gears; CCW positive)}")
+            st.latex(r"|\omega_1|N_1=|\omega_2|N_2\ \text{(gear-speed magnitudes)}")
+            st.latex(r"v=|\omega|\,r_{/IC} \qquad \text{(speed about a finite IC)}")
 
             st.markdown("### Important direction rules")
             st.markdown(
                 """
-                - For a point on a rotating link, velocity is **perpendicular to the line from the centre/base point to that point**.  
-                - For a slider, velocity must lie **along its guide**.  
+                - For rotation about a **fixed pivot**, absolute velocity is **perpendicular to the radius from that pivot**.  
+                - When the base point moves, apply the perpendicular rule to the **relative velocity**, then add the base-point velocity.  
+                - For a slider in a **fixed straight guide**, velocity lies **along that guide**.  
                 - For two points on the same rigid body, the relative velocity term is **perpendicular to the line joining the two points**.  
                 - For an **open belt**, the pulleys rotate in the **same direction**.  
                 - For a **crossed belt**, the pulleys rotate in **opposite directions**.  
@@ -2471,7 +2622,7 @@ def render_learn_tab(topic):
             st.markdown(
                 r"""
                 - **Pure translation** &#8594; every point has the **same velocity vector**.  
-                - **Fixed-axis rotation** &#8594; use $v=\omega r$ at each point.  
+                - **Fixed-axis rotation** &#8594; use $v=|\omega|r$ for speed at each point.  
                 - **Two points on one moving link** &#8594; use the **relative-velocity equation**.  
                 - **Slider-link with known directions** &#8594; the **IC method** is often fastest for velocity only.  
                 - **Belts / pulleys** &#8594; use **equal tangential belt speed**.  
@@ -2529,10 +2680,15 @@ def render_learn_tab(topic):
             )
 
             st.markdown("### Core equations")
-            st.latex(r"\mathbf a_B=\mathbf a_A+\boldsymbol\alpha\times\mathbf r_{B/A}-\omega^2\mathbf r_{B/A}")
-            st.latex(r"a_t=\alpha r")
+            st.latex(r"\mathbf{a}_B=\mathbf{a}_A+\boldsymbol\alpha\times\mathbf{r}_{B/A}-\omega^2\mathbf{r}_{B/A}")
+            st.latex(r"a_t=|\alpha|r \qquad \text{(tangential magnitude)}")
             st.latex(r"a_n=\omega^2 r=\dfrac{v^2}{r}")
-            st.latex(r"\alpha_A r_A=\alpha_B r_B \qquad \text{(no-slip tangential acceleration only)}")
+            st.latex(r"\alpha_A r_A=\alpha_B r_B\ \text{(open belt)},\qquad\alpha_A r_A=-\alpha_B r_B\ \text{(crossed belt)}")
+            st.caption(
+                "In a_n = v squared / r, v is speed relative to the centre/base point. "
+                "For a moving link, use the relative speed, not the endpoint's absolute speed. "
+                "The full relative acceleration need not point toward the base: only its normal term does."
+            )
 
             st.markdown("### Direction rules")
             st.markdown(
@@ -2540,7 +2696,7 @@ def render_learn_tab(topic):
                 - Tangential acceleration $a_t$ is **perpendicular** to the radius or link.  
                 - Normal acceleration $a_n$ points **toward the centre / base point**.  
                 - For a link $AB$, the relative normal acceleration of $B$ with respect to $A$ points **from B toward A**.  
-                - Slider acceleration must lie **along the guide**.  
+                - Slider acceleration lies **along a fixed straight guide**; a curved guide also produces a normal component.  
                 """
             )
 
