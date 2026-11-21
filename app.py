@@ -80,7 +80,7 @@ def load_logo_b64():
 
 
 LOGO_B64 = load_logo_b64()
-APP_BUILD_ID = "encoding-proof-diagrams-random-ab-bc-2026-11-21-r4"
+APP_BUILD_ID = "encoding-proof-math-rendering-random-ab-bc-2026-11-21-r5"
 
 COLORS = {
     "known": "#2563eb",      # blue
@@ -283,6 +283,198 @@ def render_header():
         """,
         unsafe_allow_html=True,
     )
+
+
+_MATH_TOKEN_PATTERNS = (
+    # Longest and most specific expressions first.
+    ("v_B = v_A + \u03c9 \u00d7 r_B/A", r"\mathbf v_B=\mathbf v_A+\boldsymbol\omega\times\mathbf r_{B/A}"),
+    ("\u03c9_A r_A = \u03c9_B r_B", r"\omega_A r_A=\omega_B r_B"),
+    ("\u03c9_1 r_1 = \u03c9_2 r_2", r"\omega_1 r_1=\omega_2 r_2"),
+    ("\u03c9_1 N_1 = \u03c9_2 N_2", r"\omega_1 N_1=\omega_2 N_2"),
+    ("a_t = \u03b1r and a_n = \u03c9\u00b2r", r"a_t=\alpha r\quad\text{and}\quad a_n=\omega^2r"),
+    (r"-omega_BC squared times r_C/B", r"-\omega_{BC}^{2}\mathbf r_{C/B}"),
+    ("a_n(C/B)", r"\mathbf a^{n}_{C/B}"),
+    (r"v_B/A", r"\mathbf v_{B/A}"),
+    (r"v_C/B", r"\mathbf v_{C/B}"),
+    (r"a_B/A", r"\mathbf a_{B/A}"),
+    (r"a_C/B", r"\mathbf a_{C/B}"),
+    (r"r_B/A", r"\mathbf r_{B/A}"),
+    (r"r_C/B", r"\mathbf r_{C/B}"),
+    ("\u03c9r", r"\omega r"),
+    ("\u03b1r", r"\alpha r"),
+    ("\u03c9\u00b2r", r"\omega^{2}r"),
+    ("\u03b1\u00b2r", r"\alpha^{2}r"),
+    ("\u03c9_BC\u00b2", r"\omega_{BC}^{2}"),
+    ("\u03c9_AB\u00b2", r"\omega_{AB}^{2}"),
+    ("\u03b1_BC\u00b2", r"\alpha_{BC}^{2}"),
+    ("\u03b1_AB\u00b2", r"\alpha_{AB}^{2}"),
+    ("\u03c9_A\u00b2", r"\omega_A^{2}"),
+    ("\u03c9_B\u00b2", r"\omega_B^{2}"),
+    ("\u03b1_A\u00b2", r"\alpha_A^{2}"),
+    ("\u03b1_B\u00b2", r"\alpha_B^{2}"),
+    ("\u03c9\u00b2", r"\omega^{2}"),
+    ("\u03b1\u00b2", r"\alpha^{2}"),
+    ("\u03c9_AB", r"\omega_{AB}"),
+    ("\u03c9_BC", r"\omega_{BC}"),
+    ("\u03b1_AB", r"\alpha_{AB}"),
+    ("\u03b1_BC", r"\alpha_{BC}"),
+    ("\u03c9_A", r"\omega_A"),
+    ("\u03c9_B", r"\omega_B"),
+    ("\u03c9_C", r"\omega_C"),
+    ("\u03c9_D", r"\omega_D"),
+    ("\u03b1_A", r"\alpha_A"),
+    ("\u03b1_B", r"\alpha_B"),
+    (r"v_B", r"\mathbf v_B"),
+    (r"v_C", r"\mathbf v_C"),
+    (r"v_A", r"\mathbf v_A"),
+    (r"v_P", r"\mathbf v_P"),
+    (r"a_B", r"\mathbf a_B"),
+    (r"a_C", r"\mathbf a_C"),
+    (r"a_A", r"\mathbf a_A"),
+    (r"a_P", r"\mathbf a_P"),
+    (r"a_t", r"a_t"),
+    (r"a_n", r"a_n"),
+    (r"s_C", r"s_C"),
+    ("\u00d7", r"\times"),
+    ("\u03c9", r"\omega"),
+    ("\u03b1", r"\alpha"),
+    ("\u03b8", r"\theta"),
+)
+
+
+def _outside_math_transform(text, transform):
+    """Apply a transform only outside existing dollar-delimited math spans."""
+    parts = str(text).split("$")
+    for index in range(0, len(parts), 2):
+        parts[index] = transform(parts[index])
+    return "$".join(parts)
+
+
+def _replace_math_tokens(text):
+    """Replace plain student-facing variable names with rendered inline LaTeX."""
+    import re
+
+    def transform(segment):
+        protected = []
+        protected_latex = []
+
+        def protect(match):
+            protected.append(match.group(0))
+            return "@@MATH" + str(len(protected) - 1) + "@@"
+
+        def protect_latex(value):
+            protected_latex.append(value)
+            return "@@LATEX" + str(len(protected_latex) - 1) + "@@"
+
+        quantity_pattern = re.compile(
+            r"(?<![A-Za-z0-9_])"
+            r"(?:AB|BC|[rNvasta](?:_[A-Za-z0-9/]+)?(?:\(0\))?|[\u03c9\u03b1\u03b8](?:_[A-Za-z0-9]+)?(?:\u00b2)?)"
+            r"\s*=\s*[-+]?\d+(?:\.\d+)?"
+            r"(?:\s*(?:m/s\u00b2|rad/s\u00b2|m/s|rad/s|m|s|\u00b0))?"
+        )
+        segment = quantity_pattern.sub(protect, segment)
+        number_unit_pattern = re.compile(
+            r"(?<![A-Za-z0-9])[-+]?\d+(?:\.\d+)?\s*(?:m/s\u00b2|rad/s\u00b2|m/s|rad/s|m|s)"
+        )
+        segment = number_unit_pattern.sub(protect, segment)
+        segment = re.sub(r"(?<![A-Za-z0-9])[-+]?\d+(?:\.\d+)?\u00b0", protect, segment)
+
+        for plain, latex in _MATH_TOKEN_PATTERNS:
+            pattern = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(plain) + r"(?![A-Za-z0-9_])")
+            segment = pattern.sub(lambda _m, value=latex: protect_latex(value), segment)
+
+        for plain, latex in {
+            "\u03c9r": r"\omega r", "\u03b1r": r"\alpha r", "v\u00b2/r": r"v^{2}/r",
+            "+x": r"+x", "+y": r"+y", "-x": r"-x", "+s_C": r"+s_C",
+        }.items():
+            segment = segment.replace(plain, "$" + latex + "$")
+
+        for index, original in enumerate(protected):
+            latex = original.replace("\u03c9", r"\omega").replace("\u03b1", r"\alpha").replace("\u03b8", r"\theta")
+            latex = latex.replace("\u00b2", "^{2}").replace("\u00b0", "^{\\circ}")
+            latex = re.sub(r"(\\(?:omega|alpha|theta)|[rNvasa])_([A-Za-z0-9/]+)", r"\1_{\2}", latex)
+            latex = re.sub(
+                r"(?<![A-Za-z])([va])_\{([A-Z](?:/[A-Z])?)\}",
+                lambda match: r"\mathbf{" + match.group(1) + "}_{" + match.group(2) + "}",
+                latex,
+            )
+            latex = re.sub(
+                r"(?<![A-Za-z])r_\{([A-Z]/[A-Z])\}",
+                lambda match: r"\mathbf r_{" + match.group(1) + "}",
+                latex,
+            )
+            latex = re.sub(
+                r"\s+(m/s\^\{2\}|rad/s\^\{2\}|m/s|rad/s|m|s)$",
+                lambda match: r"\ \mathrm{" + match.group(1) + "}",
+                latex,
+            )
+            segment = segment.replace("@@MATH" + str(index) + "@@", "$" + latex + "$")
+        for index, latex in enumerate(protected_latex):
+            segment = segment.replace("@@LATEX" + str(index) + "@@", "$" + latex + "$")
+        return segment
+
+    return _outside_math_transform(text, transform)
+
+
+def format_math_text(text):
+    """Return Streamlit Markdown with every student-facing formula rendered."""
+    return _replace_math_tokens(str(text))
+
+
+def equation_markdown(text):
+    """Render an equation-choice string as one LaTeX expression."""
+    import re
+
+    value = str(text)
+    suffix = ""
+    for phrase in (" always", " only"):
+        if value.endswith(phrase):
+            value = value[:-len(phrase)]
+            suffix = r"\quad\text{" + phrase.strip() + "}"
+            break
+    value = value.replace(" and ", r"\quad\text{and}\quad ")
+    value = value.replace("\u03c9", r"\omega").replace("\u03b1", r"\alpha").replace("\u03b8", r"\theta")
+    value = value.replace("\u00d7", r"\times").replace("\u00b2", "^{2}")
+    value = re.sub(r"(\\(?:omega|alpha|theta)|[varkNs])_([A-Za-z0-9/]+)", r"\1_{\2}", value)
+    value = re.sub(
+        r"(?<![A-Za-z])([va])_\{([A-Z](?:/[A-Z])?)\}",
+        lambda match: r"\mathbf{" + match.group(1) + "}_{" + match.group(2) + "}",
+        value,
+    )
+    value = re.sub(
+        r"(?<![A-Za-z])([va])_([A-Z](?:/[A-Z])?)",
+        lambda match: r"\mathbf{" + match.group(1) + "}_{" + match.group(2) + "}",
+        value,
+    )
+    value = re.sub(
+        r"(?<![A-Za-z])r_\{([A-Z]/[A-Z])\}",
+        lambda match: r"\mathbf{r}_{" + match.group(1) + "}",
+        value,
+    )
+    value = re.sub(
+        r"(\\(?:omega|alpha|theta))(?=[A-Za-z])",
+        lambda match: match.group(1) + " ",
+        value,
+    )
+    return "$" + value + suffix + "$"
+
+
+def _display_options(options, equation=False):
+    formatter = equation_markdown if equation else format_math_text
+    return [formatter(option) for option in options]
+
+
+def render_given_values(givens):
+    """Use Markdown rather than raw HTML so subscripts and units render."""
+    with st.container(border=True):
+        st.markdown("**Given values**")
+        for given in givens:
+            st.markdown("- " + format_math_text(given))
+
+
+def unit_markdown(unit):
+    value = str(unit).replace("\u00b2", "^2")
+    return r"$\mathrm{" + value + "}$"
 
 
 PROBLEMS = [
@@ -1064,7 +1256,7 @@ def _vec_latex(vector, unit):
 
 
 def make_random_two_link_problem(seed):
-    """Create a deterministic problem state from the displayed attempt seed."""
+    """Create a deterministic problem state from the displayed Question ID."""
     rng = np.random.default_rng(int(seed))
     candidates = [
         (theta, beta, guide)
@@ -1183,7 +1375,7 @@ def make_random_two_link_problem(seed):
             "Determine the velocities and accelerations of B and C and the angular velocity and angular acceleration of BC."
         ),
         "givens": [
-            f"Attempt seed = {int(seed)} (re-enter this seed to reproduce the geometry)",
+            f"Question ID = {int(seed)} (reproduces this exact randomized problem)",
             f"AB = {RANDOM_L_AB:.2f} m; BC = {RANDOM_L_BC:.2f} m",
             f"Angle of AB = {theta_ab}\u00b0 from +x",
             f"Angle of BC = {theta_bc}\u00b0 below -x",
@@ -2197,10 +2389,10 @@ def render_learn_tab(topic):
             st.markdown(
                 r"""
                 1. Adopt **+x right, +y up, and counterclockwise positive**.  
-                2. Use fixed-axis rotation of AB to find \(\mathbf v_B\) and \(\mathbf a_B\).  
-                3. Represent the slider quantities as \(\mathbf v_C=s_C\mathbf d_C\) and \(\mathbf a_C=\ddot s_C\mathbf d_C\).  
-                4. Apply relative velocity to BC and solve the two component equations for \(s_C\) and \(\omega_{BC}\).  
-                5. Use that \(\omega_{BC}\) in the relative-acceleration equation, including both tangential and normal terms.  
+                2. Use fixed-axis rotation of AB to find $\mathbf v_B$ and $\mathbf a_B$.  
+                3. Represent the slider quantities as $\mathbf v_C=s_C\mathbf d_C$ and $\mathbf a_C=\ddot s_C\mathbf d_C$.  
+                4. Apply relative velocity to BC and solve the two component equations for $s_C$ and $\omega_{BC}$.  
+                5. Use that $\omega_{BC}$ in the relative-acceleration equation, including both tangential and normal terms.  
                 6. Check that the velocity and acceleration vector polygons close.
                 """
             )
@@ -2213,29 +2405,24 @@ def render_learn_tab(topic):
             st.markdown("### Sign and direction reminders")
             st.markdown(
                 r"""
-                - \(\mathbf v_B\) is perpendicular to AB.  
-                - \(\mathbf v_{C/B}\) is perpendicular to BC.  
-                - \(\mathbf a^t_{C/B}\) is perpendicular to BC.  
-                - \(\mathbf a^n_{C/B}\) points from C toward B.  
-                - Both \(\mathbf v_C\) and \(\mathbf a_C\) lie along the fixed straight guide.  
-                - A negative \(\omega\) or \(\alpha\) means clockwise. A negative slider scalar means opposite the displayed positive guide arrow.
+                - $\mathbf v_B$ is perpendicular to AB.  
+                - $\mathbf v_{C/B}$ is perpendicular to BC.  
+                - $\mathbf a^t_{C/B}$ is perpendicular to BC.  
+                - $\mathbf a^n_{C/B}$ points from C toward B.  
+                - Both $\mathbf v_C$ and $\mathbf a_C$ lie along the fixed straight guide.  
+                - A negative $\omega$ or $\alpha$ means clockwise. A negative slider scalar means opposite the displayed positive guide arrow.
                 """
             )
-            st.markdown(
-                """
-                <div class="warning">
-                <b>Do velocity first.</b><br>
-                The normal acceleration of C relative to B contains the calculated
-                value of omega_BC squared. Skipping the velocity analysis makes the
-                acceleration calculation incomplete.
-                </div>
-                """,
-                unsafe_allow_html=True,
+            st.warning(
+                r"**Do velocity first.** The normal acceleration of C relative to B contains "
+                r"the calculated value $\omega_{BC}^{2}$. Skipping the velocity analysis "
+                r"makes the acceleration calculation incomplete."
             )
             st.markdown("### Reproducibility")
             st.markdown(
-                "Every question displays its attempt seed. Entering the same seed reproduces "
-                "the same AB angle, BC angle, guide direction, calculations, and diagrams."
+                "Every randomized question displays a **Question ID**. Entering the same "
+                "Question ID reproduces the same AB angle, BC angle, guide direction, "
+                "calculations, answers, and diagrams."
             )
         return
 
@@ -2254,7 +2441,7 @@ def render_learn_tab(topic):
                    - IC method,
                    - no-slip belt/pulley relation,
                    - gear-speed relation.  
-                4. **Resolve angled vectors into** \(\mathbf{i}\) **and** \(\mathbf{j}\) **components**.  
+                4. **Resolve angled vectors into** $\mathbf{i}$ **and** $\mathbf{j}$ **components**.  
                 5. **Solve the scalar equations** and then check whether the sign and direction make physical sense.  
                 """
             )
@@ -2284,7 +2471,7 @@ def render_learn_tab(topic):
             st.markdown(
                 r"""
                 - **Pure translation** &#8594; every point has the **same velocity vector**.  
-                - **Fixed-axis rotation** &#8594; use \(v=\omega r\) at each point.  
+                - **Fixed-axis rotation** &#8594; use $v=\omega r$ at each point.  
                 - **Two points on one moving link** &#8594; use the **relative-velocity equation**.  
                 - **Slider-link with known directions** &#8594; the **IC method** is often fastest for velocity only.  
                 - **Belts / pulleys** &#8594; use **equal tangential belt speed**.  
@@ -2333,11 +2520,11 @@ def render_learn_tab(topic):
             st.markdown("### Step-by-step method")
             st.markdown(
                 r"""
-                1. **Do the velocity analysis first** if any normal term depends on \(\omega\).  
+                1. **Do the velocity analysis first** if any normal term depends on $\omega$.  
                 2. **Mark the acceleration constraints** of fixed points, sliders, pulleys, and shared pins.  
                 3. **Split the relative acceleration into tangential and normal parts**.  
                 4. **Write the full vector equation**, not only one part.  
-                5. **Resolve into** \(\mathbf{i}\) **and** \(\mathbf{j}\) **components** and solve.  
+                5. **Resolve into** $\mathbf{i}$ **and** $\mathbf{j}$ **components** and solve.  
                 """
             )
 
@@ -2350,9 +2537,9 @@ def render_learn_tab(topic):
             st.markdown("### Direction rules")
             st.markdown(
                 r"""
-                - Tangential acceleration \(a_t\) is **perpendicular** to the radius or link.  
-                - Normal acceleration \(a_n\) points **toward the centre / base point**.  
-                - For a link \(AB\), the relative normal acceleration of \(B\) with respect to \(A\) points **from B toward A**.  
+                - Tangential acceleration $a_t$ is **perpendicular** to the radius or link.  
+                - Normal acceleration $a_n$ points **toward the centre / base point**.  
+                - For a link $AB$, the relative normal acceleration of $B$ with respect to $A$ points **from B toward A**.  
                 - Slider acceleration must lie **along the guide**.  
                 """
             )
@@ -2363,8 +2550,8 @@ def render_learn_tab(topic):
                 r"""
                 Acceleration analysis is harder than velocity analysis because the relative term has
                 **two rotational parts**:
-                - a **tangential component** from angular acceleration \(\alpha\)
-                - a **normal component** from angular velocity \(\omega\)
+                - a **tangential component** from angular acceleration $\alpha$
+                - a **normal component** from angular velocity $\omega$
                 """
             )
 
@@ -2382,11 +2569,11 @@ def render_learn_tab(topic):
             st.markdown("### Common mistakes")
             st.markdown(
                 r"""
-                - Forgetting the normal term \(\omega^2 r\).  
-                - Writing \(\alpha^2 r\) instead of \(\omega^2 r\).  
+                - Forgetting the normal term $\omega^2 r$.  
+                - Writing $\alpha^2 r$ instead of $\omega^2 r$.  
                 - Drawing the normal acceleration **away from** the centre instead of **toward** it.  
                 - Treating the IC as a fixed centre for acceleration.  
-                - Forgetting that for pulleys / belts, the **tangential** acceleration relationship transfers through no-slip, but the **normal** acceleration is not generally the same because \(a_n=v^2/r\).  
+                - Forgetting that for pulleys / belts, the **tangential** acceleration relationship transfers through no-slip, but the **normal** acceleration is not generally the same because $a_n=v^2/r$.  
                 - Ignoring slider direction constraints.  
                 - Mixing tangential and normal parts into one undefined arrow.  
                 """
@@ -2396,7 +2583,7 @@ def render_learn_tab(topic):
             st.markdown(
                 r"""
                 - Always label which part is **tangential** and which part is **normal**.  
-                - If you know the belt speed is the same on two pulleys, that does **not** mean the normal accelerations are the same; different radii give different \(v^2/r\).  
+                - If you know the belt speed is the same on two pulleys, that does **not** mean the normal accelerations are the same; different radii give different $v^2/r$.  
                 - A negative angular acceleration result means the real sense is opposite to the assumed positive sense.  
                 """
             )
@@ -2426,18 +2613,20 @@ def render_direction_tab(problem, mode):
     st.markdown("---")
 
     for i, item in enumerate(problem["direction_questions"]):
-        st.markdown(f"**{i+1}. {item['q']}**")
-        response = st.radio(
+        st.markdown(f"**{i+1}.** " + format_math_text(item["q"]))
+        display_options = _display_options(item["options"], equation=False)
+        displayed_response = st.radio(
             f"Direction question {i+1}",
-            item["options"],
+            display_options,
             key=f"{problem['id']}_dir_{i}",
             label_visibility="collapsed",
         )
+        response = item["options"][display_options.index(displayed_response)]
         if mode == "Practice":
             if response == item["correct"]:
-                st.markdown(f"<div class='good'>Correct. {item['why']}</div>", unsafe_allow_html=True)
+                st.success("Correct. " + format_math_text(item["why"]))
             else:
-                st.markdown(f"<div class='bad'>Not yet. {item['why']}</div>", unsafe_allow_html=True)
+                st.error("Not yet. " + format_math_text(item["why"]))
 
 
 def render_equation_tab(problem, mode):
@@ -2459,18 +2648,20 @@ def render_equation_tab(problem, mode):
     with question_col:
         st.markdown("### Equation choice")
         for i, item in enumerate(problem["equation_questions"]):
-            st.markdown(f"**{i+1}. {item['q']}**")
-            response = st.radio(
+            st.markdown(f"**{i+1}.** " + format_math_text(item["q"]))
+            display_options = _display_options(item["options"], equation=True)
+            displayed_response = st.radio(
                 f"Equation question {i+1}",
-                item["options"],
+                display_options,
                 key=f"{problem['id']}_eq_{i}",
                 label_visibility="collapsed",
             )
+            response = item["options"][display_options.index(displayed_response)]
             if mode == "Practice":
                 if response == item["correct"]:
-                    st.markdown(f"<div class='good'>Correct. {item['why']}</div>", unsafe_allow_html=True)
+                    st.success("Correct. " + format_math_text(item["why"]))
                 else:
-                    st.markdown(f"<div class='bad'>Try again. {item['why']}</div>", unsafe_allow_html=True)
+                    st.error("Try again. " + format_math_text(item["why"]))
 
 
 def render_problem_tab(problem):
@@ -2478,11 +2669,8 @@ def render_problem_tab(problem):
     with c1:
         st.markdown("## Current problem")
         st.caption(f"{problem['topic']} | Level {problem['level']} | Difficulty: {problem['difficulty']}")
-        st.markdown(problem["description"])
-        st.markdown(
-            "<div class='hint'><b>Given values</b><br>" + "<br>".join(f"&#8226; {g}" for g in problem["givens"]) + "</div>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(format_math_text(problem["description"]))
+        render_given_values(problem["givens"])
     with c2:
         st.markdown("### Bare-minimum question diagram")
         render_problem_figure(problem)
@@ -2508,10 +2696,12 @@ def render_solve_tab(problem, mode):
     entered = {}
     for i, out in enumerate(problem["solve_outputs"]):
         with cols[i % len(cols)]:
+            st.markdown(format_math_text("**" + out["label"] + "**") + " (" + unit_markdown(out["unit"]) + ")")
             entered[out["key"]] = st.number_input(
-                f"{out['label']} ({out['unit']})",
+                "Enter numerical value",
                 key=f"{problem['id']}_{out['key']}",
                 format="%.4f",
+                label_visibility="collapsed",
             )
 
     if st.button("Check final answers", key=f"check_{problem['id']}"):
@@ -2520,20 +2710,19 @@ def render_solve_tab(problem, mode):
             ok = is_close(entered[out["key"]], out["value"], out["tol"])
             checks.append(ok)
             if ok:
-                st.markdown(
-                    f"<div class='good'>{out['label']}: correct.</div>",
-                    unsafe_allow_html=True,
-                )
+                st.success(format_math_text(out["label"]) + ": correct.")
             else:
                 if mode == "Practice":
-                    st.markdown(
-                        f"<div class='bad'>{out['label']}: not yet. Expected approximately {out['value']:.4f} {out['unit']}.</div>",
-                        unsafe_allow_html=True,
+                    st.error(
+                        format_math_text(out["label"])
+                        + f": not yet. Expected approximately {out['value']:.4f} "
+                        + unit_markdown(out["unit"])
+                        + "."
                     )
                 else:
-                    st.markdown(
-                        f"<div class='bad'>{out['label']}: not yet. Check the sign convention and component equations.</div>",
-                        unsafe_allow_html=True,
+                    st.error(
+                        format_math_text(out["label"])
+                        + ": not yet. Check the sign convention and component equations."
                     )
 
         if all(checks):
@@ -2595,7 +2784,7 @@ def render_solution_tab(problem, mode):
             st.latex(line)
 
     st.markdown("### Teaching point")
-    st.markdown(f"<div class='hint'>{problem['teaching_point']}</div>", unsafe_allow_html=True)
+    st.info(format_math_text(problem["teaching_point"]))
 
 
 def sidebar_controls():
@@ -2626,27 +2815,27 @@ def sidebar_controls():
         st.sidebar.caption(f"Problem: {names[level]}")
         problem = get_problem(topic, level)
     else:
-        st.sidebar.markdown("### Randomized attempt")
+        st.sidebar.markdown("### Randomized question")
         if "random_ab_bc_seed" not in st.session_state:
             st.session_state["random_ab_bc_seed"] = 20261121
-        if st.sidebar.button("Generate another combination", key="new_random_ab_bc"):
+        if st.sidebar.button("Generate a new random problem", key="new_random_ab_bc"):
             current = int(st.session_state["random_ab_bc_seed"])
             st.session_state["random_ab_bc_seed"] = (1664525 * current + 1013904223) % 900000000 + 1
         seed = st.sidebar.number_input(
-            "Attempt seed",
+            "Question ID (reproduces the same random problem)",
             min_value=1,
             max_value=999999999,
             step=1,
             key="random_ab_bc_seed",
-            help="The same seed always reproduces the same three randomized angles and solution.",
+            help="Enter or share this Question ID to reproduce the same AB angle, BC angle, C-guide angle, calculations, answers, and diagrams.",
         )
         problem = make_random_two_link_problem(int(seed))
         data = problem["kinematics"]
-        st.sidebar.caption(
+        st.sidebar.caption(format_math_text(
             f"AB angle: {data['theta_ab']:.0f}\u00b0 | "
             f"BC angle: {data['theta_bc_down']:.0f}\u00b0 below -x | "
             f"C guide: {data['guide_down']:.0f}\u00b0 below -x"
-        )
+        ))
         st.sidebar.caption("Problem: " + problem["title"])
 
     st.sidebar.markdown("---")
